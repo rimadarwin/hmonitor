@@ -40,6 +40,14 @@ def _serialize_result(result: UpdateResult):
     return payload
 
 
+@app.get("/")
+def root():
+    """Render e altri bilanciatori spesso provano GET /; evita 404 nei check."""
+    return jsonify(
+        {"status": "ok", "service": "update-request-dates", "paths": ["/health", "/update"]}
+    )
+
+
 @app.get("/health")
 def health():
     return jsonify({"status": "ok", "service": "update-request-dates"})

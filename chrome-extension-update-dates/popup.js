@@ -1,4 +1,5 @@
-const DEFAULT_API = "http://127.0.0.1:8765";
+/** Base API senza :porta su Render (HTTPS = 443). Per locale usa Impostazioni → 127.0.0.1:8765. */
+const DEFAULT_API = "https://hmonitor-uhk9.onrender.com";
 const DEFAULT_VT1_URL =
   "https://gh-manage-co-dev-int-a0c1c0ddf5f3.herokuapp.com/dlsii/inboundflow";
 
