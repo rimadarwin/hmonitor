@@ -1,0 +1,28 @@
+{
+  "manifest_version": 3,
+  "name": "Hera richieste — date e VT1",
+  "version": "1.4.0",
+  "description": "Aggiorna date su DB locale oppure invia flusso VT1.0150 (inbound DLSII).",
+  "minimum_chrome_version": "114",
+  "action": {
+    "default_title": "Apri pannello operazioni (a destra)"
+  },
+  "background": {
+    "service_worker": "sw.js"
+  },
+  "side_panel": {
+    "default_path": "popup.html"
+  },
+  "options_ui": {
+    "page": "options.html",
+    "open_in_tab": true
+  },
+  "permissions": ["storage", "scripting", "activeTab", "sidePanel"],
+  "host_permissions": [
+    "http://127.0.0.1/*",
+    "http://localhost/*",
+    "https://gh-manage-co-dev-int-a0c1c0ddf5f3.herokuapp.com/*",
+    "http://*/*",
+    "https://*/*"
+  ]
+}

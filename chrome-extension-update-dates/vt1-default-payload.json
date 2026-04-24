@@ -1,0 +1,37 @@
+{
+  "prestazione": {
+    "header": {
+      "distributore": "PA_DS13D00000AU",
+      "venditore": "PA_VT13V0000000",
+      "causale": "VT1",
+      "flusso": "0150",
+      "user": "BS_030_001",
+      "servizio": "VT1",
+      "operazione": "VT1.0150",
+      "erogatore": "UT0261",
+      "fruitore": "AU"
+    },
+    "requests": [
+      {
+        "fields": [
+          { "field": "CODCAUS", "value": "VT1" },
+          { "field": "COD_FLUSSO", "value": "0150" },
+          { "field": "PIVA_MITT", "value": "02221101203" },
+          { "field": "PIVA_DEST", "value": "05877611003" },
+          { "field": "DOCUMENTKEY", "value": "" },
+          { "field": "RIF_EXT", "value": "" },
+          { "field": "POD", "value": "" },
+          { "field": "DES_ESITO_ATTIVITA", "value": "1" },
+          { "field": "EXT_COD_FISCALE", "value": "CNCFLV56A16I459C" },
+          { "field": "EXT_PIVA", "value": "" },
+          { "field": "EXT_CF_STRANIERO", "value": "0" },
+          { "field": "EXT_NOME", "value": "FLAVIO" },
+          { "field": "EXT_COGNOME", "value": "CANCELLIERI" },
+          { "field": "EXT_RAGSOC", "value": "" },
+          { "field": "EXT_DATA_ESEC", "value": "" }
+        ]
+      }
+    ]
+  },
+  "strutturaRipetibile": {}
+}

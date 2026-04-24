@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Operazioni richiesta</title>
+  <link rel="stylesheet" href="popup.css" />
+</head>
+<body class="is-side-panel">
+  <main class="wrap">
+    <!-- Home: scelta azione -->
+    <section id="screenHome">
+      <h1>Operazioni</h1>
+      <p class="hint">Scegli l’azione. Per VT1 apri il dettaglio richiesta nel tab attivo prima di cliccare.</p>
+      <button type="button" id="goDates" class="choice primary">Aggiorna data</button>
+      <button type="button" id="goVt1" class="choice accent">VT1 ELE 150</button>
+      <p class="footer">
+        <a href="#" id="openOptionsHome">Impostazioni</a>
+      </p>
+    </section>
+
+    <!-- Aggiorna data (server locale) -->
+    <section id="screenDates" class="hidden">
+      <h1>Aggiorna data</h1>
+      <p class="hint">
+        Avvia: <code>python update_dates_api_server.py</code>
+      </p>
+      <label class="field">
+        <span>Codice richiesta</span>
+        <input type="text" id="requestCode" placeholder="es. V00000030814" autocomplete="off" spellcheck="false" />
+      </label>
+      <button type="button" id="runBtn" class="primary">Aggiorna al giorno odierno</button>
+      <div id="statusDates" class="status" aria-live="polite"></div>
+      <pre id="logDates" class="log hidden"></pre>
+      <button type="button" id="backFromDates" class="linkish">← Indietro</button>
+      <p class="footer tight">
+        <a href="#" id="openOptionsDates">Impostazioni API locale</a>
+      </p>
+    </section>
+
+    <!-- VT1 inbound -->
+    <section id="screenVt1" class="hidden">
+      <h1>VT1 · flusso 0150</h1>
+      <p class="hint">Campi letti dal tab corrente (dettaglio richiesta). Controlla e invia.</p>
+      <button type="button" id="scrapeAgain" class="secondary full">Refresh dati</button>
+      <label class="field">
+        <span>DOCUMENTKEY</span>
+        <input type="text" id="vt1Documentkey" autocomplete="off" spellcheck="false" />
+      </label>
+      <label class="field">
+        <span>RIF_EXT (Codice pratica SII)</span>
+        <input type="text" id="vt1RifExt" autocomplete="off" spellcheck="false" />
+      </label>
+      <label class="field">
+        <span>POD</span>
+        <input type="text" id="vt1Pod" autocomplete="off" spellcheck="false" />
+      </label>
+      <p class="subhint">Dati cliente (da pagina)</p>
+      <label class="field">
+        <span>EXT_NOME</span>
+        <input type="text" id="vt1Nome" autocomplete="off" spellcheck="false" />
+      </label>
+      <label class="field">
+        <span>EXT_COGNOME</span>
+        <input type="text" id="vt1Cognome" autocomplete="off" spellcheck="false" />
+      </label>
+      <label class="field">
+        <span>EXT_RAGSOC</span>
+        <input type="text" id="vt1Ragsoc" autocomplete="off" spellcheck="false" />
+      </label>
+      <label class="field">
+        <span>EXT_COD_FISCALE</span>
+        <input type="text" id="vt1Cf" autocomplete="off" spellcheck="false" />
+      </label>
+      <label class="field">
+        <span>EXT_DATA_ESEC (AAAAMMGG)</span>
+        <input type="text" id="vt1ExtData" autocomplete="off" spellcheck="false" maxlength="8" />
+      </label>
+      <p class="hint vt1-auth-hint">
+        <strong>Authorization</strong> (Bearer token o Basic user/pass): configurazione in
+        <a href="#" id="openOptionsVt1Auth">Impostazioni</a>.
+      </p>
+      <label class="field">
+        <span>Cookie (opzionale, es. JSESSIONID=…)</span>
+        <input type="text" id="vt1Cookie" autocomplete="off" spellcheck="false" />
+      </label>
+      <label class="field">
+        <span>Corpo JSON</span>
+        <textarea id="vt1Json" rows="10" spellcheck="false"></textarea>
+      </label>
+      <button type="button" id="vt1ApplyFields" class="secondary full">Aggiorna JSON dai campi sopra</button>
+      <button type="button" id="vt1Send" class="primary">Invia richiesta</button>
+      <div id="statusVt1" class="status" aria-live="polite"></div>
+      <pre id="logVt1" class="log hidden"></pre>
+      <button type="button" id="backFromVt1" class="linkish">← Indietro</button>
+      <p class="footer tight">
+        <a href="#" id="openOptionsVt1">URL servizio e segreti</a>
+      </p>
+    </section>
+  </main>
+  <script src="auth-config.js"></script>
+  <script src="popup.js"></script>
+</body>
+</html>
