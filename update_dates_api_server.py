@@ -55,11 +55,16 @@ def update():
 
 
 def main():
-    port = int(os.environ.get("UPDATE_DATES_API_PORT", DEFAULT_PORT))
-    print(f"API aggiornamento date in ascolto su http://127.0.0.1:{port}")
+    # Render (e simili) impostano PORT; in locale si usa UPDATE_DATES_API_PORT o default.
+    port = int(
+        os.environ.get("PORT")
+        or os.environ.get("UPDATE_DATES_API_PORT", DEFAULT_PORT)
+    )
+    host = "0.0.0.0" if os.environ.get("PORT") else "127.0.0.1"
+    print(f"API aggiornamento date in ascolto su http://{host}:{port}")
     print("  POST /update  JSON: {\"request_code\": \"V00000030814\"}")
     print("  GET  /health")
-    app.run(host="127.0.0.1", port=port, threaded=True)
+    app.run(host=host, port=port, threaded=True)
 
 
 if __name__ == "__main__":
