@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Endpoint interno POST /partners/leads — compatibile con il contratto partners/leads.
+Endpoint interno GET /partners/leads — compatibile con il contratto partners/leads.
 
 Pensato per chiamate server-to-server (es. Salesforce); non esposto al frontend.
 """
@@ -25,7 +25,7 @@ class LeadResult:
     ok: bool
     payload: Dict[str, Any] = field(default_factory=dict)
     error: Optional[str] = None
-    status_code: int = 201
+    status_code: int = 200
 
 
 def _channel() -> str:
@@ -254,68 +254,149 @@ def _build_requested_vehicle(vehicle_in: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
-def _wrap_paginated_response(lead: Dict[str, Any]) -> Dict[str, Any]:
+def _wrap_paginated_response(
+    lead: Dict[str, Any], page: int = 1, size: int = 1
+) -> Dict[str, Any]:
     return {
         "data": [lead],
-        "page": 1,
-        "size": 1,
+        "page": page,
+        "size": size,
         "total": _list_total(),
     }
 
 
-def _has_valid_contact_channel(contact: Dict[str, Any]) -> bool:
-    emails = _normalize_emails(contact, _utc_now_iso())
-    phones = _normalize_phones(contact, _utc_now_iso())
-    return bool(emails or phones)
+def _positive_int(value: Any, default: int) -> int:
+    try:
+        return max(1, int(value))
+    except (TypeError, ValueError):
+        return default
+
+
+def _default_location_id() -> str:
+    return os.environ.get(
+        "PARTNERS_LEADS_DEFAULT_LOCATION_ID",
+        "5fb4c022-8c7d-43dc-bf6d-3f1d4b19a26f",
+    ).strip()
+
+
+def _default_external_id() -> str:
+    configured = os.environ.get("PARTNERS_LEADS_DEFAULT_EXTERNAL_ID", "").strip()
+    return configured or str(_new_id())
+
+
+def _default_email() -> str:
+    return os.environ.get("PARTNERS_LEADS_DEFAULT_EMAIL", "lead@example.com").strip()
+
+
+def _query_value(args: Any, key: str, default: str = "") -> str:
+    raw = args.get(key)
+    if raw is None:
+        return default
+    return str(raw).strip()
+
+
+def _query_value_first(args: Any, *keys: str, default: str = "") -> str:
+    for key in keys:
+        value = _query_value(args, key)
+        if value:
+            return value
+    return default
+
+
+def _payload_from_query(args: Any) -> Dict[str, Any]:
+    email = _query_value(args, "email") or _default_email()
+    phone = _query_value(args, "phone")
+    campaign_name = _query_value(args, "campaign_name")
+    details_type = _query_value_first(args, "type", "details_type", default="SALES")
+    details_status = _query_value_first(args, "status", "details_status", default="VALID")
+    page = _positive_int(args.get("page"), 1)
+    size = _positive_int(args.get("limit") or args.get("size"), 1)
+
+    contact: Dict[str, Any] = {
+        "first_name": _query_value(args, "first_name") or "Lead",
+        "last_name": _query_value(args, "last_name") or None,
+        "account": {"account_type": _query_value(args, "account_type") or "PRIVATE"},
+        "communication": {
+            "emails": [
+                {
+                    "type": _query_value(args, "email_type") or "PRIVATE",
+                    "email": email,
+                }
+            ],
+            "phones": (
+                [
+                    {
+                        "phone_number": phone,
+                        "type": _query_value(args, "phone_type") or "PRIVATE",
+                        "phone_type": _query_value(args, "phone_phone_type") or "MOBILE",
+                    }
+                ]
+                if phone
+                else []
+            ),
+        },
+    }
+
+    details: Dict[str, Any] = {
+        "type": details_type,
+        "status": details_status,
+        "source": {
+            "source": _query_value(args, "source") or "Other",
+            "source_detail": _query_value(args, "source_detail") or None,
+        },
+    }
+    if campaign_name:
+        details["campaign"] = {"name": campaign_name}
+
+    channel = _query_value(args, "channel")
+
+    return {
+        "external_id": _query_value(args, "external_id") or _default_external_id(),
+        "location_id": _query_value(args, "location_id") or _default_location_id(),
+        "channel": channel or None,
+        "owner_user_email": _query_value(args, "owner_user_email"),
+        "contact": contact,
+        "request": {
+            "request_type": _query_value(args, "request_type") or "GENERIC_SALES",
+            "description": None,
+            "expected_purchase_date": None,
+            "requested_vehicle": {
+                "vehicle_type": _query_value(args, "vehicle_type") or "NEW",
+                "make": _query_value_first(args, "vehicle_make", "make", default="Omoda"),
+                "model": _query_value_first(args, "vehicle_model", "model", default="OMODA 5"),
+                "version": _query_value_first(args, "vehicle_version", "version"),
+            },
+        },
+        "details": details,
+        "_page": page,
+        "_size": size,
+    }
 
 
 def _validate_payload(data: Dict[str, Any]) -> Optional[str]:
     if not isinstance(data, dict):
-        return "Payload JSON non valido."
-
-    external_id = (data.get("external_id") or "").strip()
-    if not external_id:
-        return "Campo obbligatorio mancante: external_id."
-
-    location_id = (data.get("location_id") or "").strip()
-    if not location_id:
-        return "Campo obbligatorio mancante: location_id."
-
-    contact = data.get("contact")
-    if not isinstance(contact, dict):
-        return "Campo obbligatorio mancante: contact."
-
-    if not _has_valid_contact_channel(contact):
-        return (
-            "Almeno un contatto valido è richiesto in "
-            "contact.communication.emails o contact.communication.phones."
-        )
-
-    request_block = data.get("request")
-    if not isinstance(request_block, dict):
-        return "Campo obbligatorio mancante: request."
-
-    if not (request_block.get("request_type") or "").strip():
-        return "Campo obbligatorio mancante: request.request_type."
+        return "Parametri non validi."
 
     details = data.get("details")
     if not isinstance(details, dict):
-        return "Campo obbligatorio mancante: details."
+        return "Parametri non validi."
 
     if not (details.get("type") or "").strip():
-        return "Campo obbligatorio mancante: details.type."
+        return "Parametro non valido: type."
 
     if not (details.get("status") or "").strip():
-        return "Campo obbligatorio mancante: details.status."
+        return "Parametro non valido: status."
 
     return None
 
 
-def run_create_partner_lead(data: Dict[str, Any]) -> LeadResult:
+def _build_lead_from_payload(data: Dict[str, Any]) -> LeadResult:
     validation_error = _validate_payload(data)
     if validation_error:
         return LeadResult(ok=False, error=validation_error, status_code=400)
 
+    page = _positive_int(data.get("_page"), 1)
+    size = _positive_int(data.get("_size"), 1)
     created_at = _utc_now_iso()
     imported_at = _utc_now_iso()
     lead_id = _new_id()
@@ -384,4 +465,12 @@ def run_create_partner_lead(data: Dict[str, Any]) -> LeadResult:
         "opportunity_id": data.get("opportunity_id"),
     }
 
-    return LeadResult(ok=True, payload=_wrap_paginated_response(lead), status_code=201)
+    return LeadResult(
+        ok=True,
+        payload=_wrap_paginated_response(lead, page=page, size=size),
+        status_code=200,
+    )
+
+
+def run_get_partner_leads(args: Any) -> LeadResult:
+    return _build_lead_from_payload(_payload_from_query(args))

@@ -1,44 +1,43 @@
 # -*- coding: utf-8 -*-
-"""Test locale per POST /partners/leads (senza avviare il server HTTP)."""
+"""Test locale per GET /partners/leads (senza avviare il server HTTP)."""
 import json
 import os
 
-from partners_leads import run_create_partner_lead
+from partners_leads import _build_lead_from_payload, run_get_partner_leads
 
-SAMPLE_PAYLOAD = {
-    "request": {
-        "description": None,
-        "expected_purchase_date": None,
-        "requested_vehicle": {
-            "vehicle_type": "NEW",
-            "version": "versione test",
-            "model": "Omoda",
-            "make": "Omoda",
-        },
-        "request_type": "GENERIC_SALES",
-    },
-    "contact": {
-        "communication": {
-            "emails": [{"type": "BUSINESS", "email": "test@test.it"}]
-        },
-        "account": {"account_type": "BUSINESS"},
-        "last_name": None,
-        "first_name": "nome lead",
-    },
-    "details": {
-        "source": {"source_detail": None, "source": "Other"},
-        "status": "VALID",
-        "type": "SALES",
-    },
-    "location_id": "5fb4c022-8c7d-43dc-bf6d-3f1d4b19a26f",
-    "owner_user_email": "francesca.sileo@xcconsulting.it",
+POSTMAN_QUERY = {
+    "page": "1",
+    "limit": "1",
+    "status": "VALID",
+    "type": "SALES",
+}
+
+SAMPLE_QUERY = {
     "external_id": "00QUA00000I2qMj2AJ",
+    "location_id": "5fb4c022-8c7d-43dc-bf6d-3f1d4b19a26f",
+    "first_name": "nome lead",
+    "email": "test@test.it",
+    "email_type": "BUSINESS",
+    "account_type": "BUSINESS",
+    "request_type": "GENERIC_SALES",
+    "vehicle_make": "Omoda",
+    "vehicle_model": "Omoda",
+    "vehicle_version": "versione test",
+    "vehicle_type": "NEW",
+    "source": "Other",
+    "owner_user_email": "francesca.sileo@xcconsulting.it",
+    "page": "1",
+    "limit": "1",
+    "status": "VALID",
+    "type": "SALES",
 }
 
 RICH_PAYLOAD = {
     "external_id": "ad8d2551-fdab-4936-89d5-5bf6b79898bc",
     "location_id": "5fb4c022-8c7d-43dc-bf6d-3f1d4b19a26f",
     "channel": "Lepas",
+    "_page": 1,
+    "_size": 1,
     "contact": {
         "first_name": "stefano",
         "last_name": "sampietro",
@@ -126,21 +125,30 @@ RICH_PAYLOAD = {
 }
 
 
-def _assert_paginated(body):
+def _assert_paginated(body, *, page=1, size=1):
     assert isinstance(body.get("data"), list) and len(body["data"]) == 1
-    assert body.get("page") == 1
-    assert body.get("size") == 1
+    assert body.get("page") == page
+    assert body.get("size") == size
     assert isinstance(body.get("total"), int) and body["total"] >= 1
     return body["data"][0]
 
 
 def main():
-    result = run_create_partner_lead(SAMPLE_PAYLOAD)
+    postman = run_get_partner_leads(POSTMAN_QUERY)
+    assert postman.ok, postman.error
+    assert postman.status_code == 200
+    postman_lead = _assert_paginated(postman.payload)
+    assert postman_lead["details"]["type"] == "SALES"
+    assert postman_lead["details"]["status"] == "VALID"
+    assert postman_lead["facility"]["id"] == "5fb4c022-8c7d-43dc-bf6d-3f1d4b19a26f"
+    assert postman_lead["contact"]["communication"]["emails"][0]["email"] == "lead@example.com"
+
+    result = run_get_partner_leads(SAMPLE_QUERY)
     assert result.ok, result.error
-    assert result.status_code == 201
+    assert result.status_code == 200
 
     lead = _assert_paginated(result.payload)
-    assert lead["external_id"] == SAMPLE_PAYLOAD["external_id"]
+    assert lead["external_id"] == SAMPLE_QUERY["external_id"]
     assert lead["channel"] == "Lepas"
     assert lead["contact"]["first_name"] == "nome lead"
     assert lead["contact"]["communication"]["emails"][0]["email"] == "test@test.it"
@@ -148,12 +156,12 @@ def main():
     assert lead["request"]["requested_vehicle"]["make"] == "Omoda"
     assert lead["request"]["description"] == ""
     assert lead["details"]["source"]["source_detail"] == "unknown"
-    assert lead["facility"]["id"] == SAMPLE_PAYLOAD["location_id"]
+    assert lead["facility"]["id"] == SAMPLE_QUERY["location_id"]
     assert lead["facility"]["name"] == "CARPOINT S.P.A. -Pomezia"
     assert lead["facility"]["address"]["country"] == ""
     assert "id" in lead and lead["id"]
 
-    rich = run_create_partner_lead(RICH_PAYLOAD)
+    rich = _build_lead_from_payload(RICH_PAYLOAD)
     assert rich.ok, rich.error
     rich_lead = _assert_paginated(rich.payload)
     assert rich_lead["channel"] == "Lepas"
@@ -163,27 +171,27 @@ def main():
     assert rich_lead["details"]["campaign"]["name"] == "nome campagna test"
     assert rich_lead["details"]["source"]["source_detail"] == "Official Website Access"
 
-    print("OK: run_create_partner_lead")
-    print(json.dumps(result.payload, indent=2, ensure_ascii=False))
+    print("OK: run_get_partner_leads (Postman params)")
+    print(json.dumps(postman.payload, indent=2, ensure_ascii=False))
 
     os.environ["PARTNERS_LEADS_API_KEY"] = "test-secret-key"
     from update_dates_api_server import app
 
     client = app.test_client()
-    unauth = client.post("/partners/leads", json=SAMPLE_PAYLOAD)
+    unauth = client.get("/partners/leads", query_string=POSTMAN_QUERY)
     assert unauth.status_code == 401, unauth.status_code
 
-    auth = client.post(
+    auth = client.get(
         "/partners/leads",
-        json=SAMPLE_PAYLOAD,
+        query_string=POSTMAN_QUERY,
         headers={"X-Internal-Api-Key": "test-secret-key"},
     )
-    assert auth.status_code == 201, auth.get_data(as_text=True)
+    assert auth.status_code == 200, auth.get_data(as_text=True)
     auth_body = auth.get_json()
-    assert auth_body["data"][0]["id"]
-    assert auth.headers.get("Location", "").startswith("/partners/leads/")
+    assert auth_body["data"][0]["details"]["status"] == "VALID"
+    assert auth_body["size"] == 1
 
-    print("OK: endpoint HTTP con autenticazione")
+    print("OK: endpoint HTTP GET con autenticazione")
 
 
 if __name__ == "__main__":
