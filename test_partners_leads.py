@@ -184,12 +184,19 @@ def main():
     auth = client.get(
         "/partners/leads",
         query_string=POSTMAN_QUERY,
-        headers={"X-Internal-Api-Key": "test-secret-key"},
+        headers={"x-oj-api-key": "test-secret-key"},
     )
     assert auth.status_code == 200, auth.get_data(as_text=True)
     auth_body = auth.get_json()
     assert auth_body["data"][0]["details"]["status"] == "VALID"
     assert auth_body["size"] == 1
+
+    legacy = client.get(
+        "/partners/leads",
+        query_string=POSTMAN_QUERY,
+        headers={"X-Internal-Api-Key": "test-secret-key"},
+    )
+    assert legacy.status_code == 200, legacy.get_data(as_text=True)
 
     print("OK: endpoint HTTP GET con autenticazione")
 

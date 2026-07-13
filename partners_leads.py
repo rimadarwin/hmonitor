@@ -57,16 +57,20 @@ def _load_facilities() -> Dict[str, Dict[str, Any]]:
         return json.load(handle)
 
 
+def _header_value(headers: Any, name: str) -> str:
+    return (headers.get(name) or "").strip()
+
+
 def is_partners_leads_authorized(headers) -> bool:
     expected = os.environ.get("PARTNERS_LEADS_API_KEY", "").strip()
     if not expected:
         return False
 
-    api_key = (headers.get("X-Internal-Api-Key") or "").strip()
-    if api_key and api_key == expected:
-        return True
+    for header_name in ("x-oj-api-key", "X-Internal-Api-Key", "X-OJ-API-KEY"):
+        if _header_value(headers, header_name) == expected:
+            return True
 
-    auth_header = (headers.get("Authorization") or "").strip()
+    auth_header = _header_value(headers, "Authorization")
     if auth_header.startswith("Bearer "):
         token = auth_header[7:].strip()
         if token == expected:
