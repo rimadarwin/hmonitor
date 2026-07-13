@@ -288,6 +288,14 @@ def _default_external_id() -> str:
     return configured or str(_new_id())
 
 
+def _default_first_name() -> str:
+    return os.environ.get("PARTNERS_LEADS_DEFAULT_FIRST_NAME", "stefano").strip()
+
+
+def _default_last_name() -> str:
+    return os.environ.get("PARTNERS_LEADS_DEFAULT_LAST_NAME", "sampietro").strip()
+
+
 def _default_email() -> str:
     return os.environ.get("PARTNERS_LEADS_DEFAULT_EMAIL", "lead@example.com").strip()
 
@@ -317,8 +325,8 @@ def _payload_from_query(args: Any) -> Dict[str, Any]:
     size = _positive_int(args.get("limit") or args.get("size"), 1)
 
     contact: Dict[str, Any] = {
-        "first_name": _query_value(args, "first_name") or "Lead",
-        "last_name": _query_value(args, "last_name") or None,
+        "first_name": _query_value(args, "first_name") or _default_first_name(),
+        "last_name": _query_value(args, "last_name") or _default_last_name(),
         "account": {"account_type": _query_value(args, "account_type") or "PRIVATE"},
         "communication": {
             "emails": [
@@ -412,8 +420,8 @@ def _build_lead_from_payload(data: Dict[str, Any]) -> LeadResult:
     details_in = data.get("details") or {}
     source_in = details_in.get("source") or {}
 
-    first_name = contact_in.get("first_name") or ""
-    last_name = contact_in.get("last_name") or ""
+    first_name = (contact_in.get("first_name") or _default_first_name()).strip()
+    last_name = (contact_in.get("last_name") or _default_last_name()).strip()
 
     source_detail = source_in.get("source_detail")
     if source_detail is None or str(source_detail).strip() == "":

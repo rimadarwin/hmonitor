@@ -141,6 +141,9 @@ def main():
     assert postman_lead["details"]["type"] == "SALES"
     assert postman_lead["details"]["status"] == "VALID"
     assert postman_lead["facility"]["id"] == "5fb4c022-8c7d-43dc-bf6d-3f1d4b19a26f"
+    assert postman_lead["contact"]["first_name"] == "stefano"
+    assert postman_lead["contact"]["last_name"] == "sampietro"
+    assert postman_lead["contact"]["account"]["company_name"] == "stefano sampietro"
     assert postman_lead["contact"]["communication"]["emails"][0]["email"] == "lead@example.com"
 
     result = run_get_partner_leads(SAMPLE_QUERY)
