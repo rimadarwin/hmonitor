@@ -78,7 +78,8 @@ def create_partner_lead():
         return jsonify({"error": result.error}), result.status_code
 
     response = make_response(jsonify(result.payload), result.status_code)
-    response.headers["Location"] = f"/partners/leads/{result.payload['id']}"
+    lead_id = result.payload["data"][0]["id"]
+    response.headers["Location"] = f"/partners/leads/{lead_id}"
     return response
 
 
