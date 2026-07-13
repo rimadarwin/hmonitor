@@ -1,0 +1,17 @@
+{
+  "5fb4c022-8c7d-43dc-bf6d-3f1d4b19a26f": {
+    "name": "CARPOINT S.P.A. -Pomezia",
+    "address": {
+      "city": "Pomezia",
+      "region": "Roma",
+      "postal_code": "00071",
+      "street": "Via Del Mare, 36",
+      "street_2": "",
+      "country": "IT",
+      "type": "UNKNOWN",
+      "privacy": []
+    },
+    "fiscal_entity_id": "e3ea4974-8253-47f2-9552-a97df0961266",
+    "fiscal_entity_name": "CARPOINT S.P.A."
+  }
+}

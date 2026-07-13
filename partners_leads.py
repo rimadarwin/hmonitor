@@ -1,0 +1,252 @@
+# -*- coding: utf-8 -*-
+"""
+Endpoint interno POST /partners/leads — compatibile con il contratto Omoda partners/leads.
+
+Pensato per chiamate server-to-server (es. Salesforce); non esposto al frontend.
+"""
+import json
+import os
+import uuid
+from copy import deepcopy
+from dataclasses import dataclass, field
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any, Dict, List, Optional
+
+from dotenv import load_dotenv
+
+load_dotenv()
+
+_FACILITIES_PATH = Path(__file__).with_name("partners_leads_facilities.json")
+_CHANNEL = "omoda"
+
+
+@dataclass
+class LeadResult:
+    ok: bool
+    payload: Dict[str, Any] = field(default_factory=dict)
+    error: Optional[str] = None
+    status_code: int = 201
+
+
+def _utc_now_iso() -> str:
+    return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
+
+
+def _new_id() -> str:
+    if hasattr(uuid, "uuid7"):
+        return str(uuid.uuid7())
+    return str(uuid.uuid4())
+
+
+def _load_facilities() -> Dict[str, Dict[str, Any]]:
+    if not _FACILITIES_PATH.is_file():
+        return {}
+    with _FACILITIES_PATH.open(encoding="utf-8") as handle:
+        return json.load(handle)
+
+
+def is_partners_leads_authorized(headers) -> bool:
+    expected = os.environ.get("PARTNERS_LEADS_API_KEY", "").strip()
+    if not expected:
+        return False
+
+    api_key = (headers.get("X-Internal-Api-Key") or "").strip()
+    if api_key and api_key == expected:
+        return True
+
+    auth_header = (headers.get("Authorization") or "").strip()
+    if auth_header.startswith("Bearer "):
+        token = auth_header[7:].strip()
+        if token == expected:
+            return True
+
+    return False
+
+
+def _normalize_emails(contact: Dict[str, Any]) -> List[Dict[str, Any]]:
+    communication = contact.get("communication") or {}
+    emails_in = communication.get("emails") or []
+    emails_out: List[Dict[str, Any]] = []
+
+    for item in emails_in:
+        if not isinstance(item, dict):
+            continue
+        email = (item.get("email") or "").strip()
+        if not email:
+            continue
+        emails_out.append(
+            {
+                "email": email,
+                "privacy": item.get("privacy") or [],
+                "type": item.get("type") or "BUSINESS",
+            }
+        )
+
+    return emails_out
+
+
+def _build_facility(location_id: str) -> Dict[str, Any]:
+    facilities = _load_facilities()
+    known = facilities.get(location_id) or {}
+
+    return {
+        "external_id": known.get("external_id"),
+        "id": location_id,
+        "name": known.get("name") or "",
+        "address": deepcopy(
+            known.get("address")
+            or {
+                "city": "",
+                "region": "",
+                "postal_code": "",
+                "street": "",
+                "street_2": "",
+                "country": "IT",
+                "type": "UNKNOWN",
+                "privacy": [],
+            }
+        ),
+        "fiscal_entity_id": known.get("fiscal_entity_id"),
+        "fiscal_entity_name": known.get("fiscal_entity_name") or "",
+    }
+
+
+def _build_requested_vehicle(vehicle_in: Dict[str, Any]) -> Dict[str, Any]:
+    vehicle_in = vehicle_in or {}
+    return {
+        "id": vehicle_in.get("id"),
+        "class": vehicle_in.get("class") or "CAR",
+        "vehicle_type": vehicle_in.get("vehicle_type") or "NEW",
+        "vehicle_status": vehicle_in.get("vehicle_status"),
+        "vin": vehicle_in.get("vin"),
+        "plate_number": vehicle_in.get("plate_number"),
+        "make": vehicle_in.get("make") or "",
+        "model": vehicle_in.get("model") or "",
+        "version": vehicle_in.get("version") or "",
+        "registration_date": vehicle_in.get("registration_date"),
+        "last_revision_date": vehicle_in.get("last_revision_date"),
+        "description": vehicle_in.get("description") or "",
+        "facility": vehicle_in.get("facility"),
+        "specification": vehicle_in.get("specification"),
+        "mileage": vehicle_in.get("mileage"),
+        "warranty": vehicle_in.get("warranty"),
+    }
+
+
+def _validate_payload(data: Dict[str, Any]) -> Optional[str]:
+    if not isinstance(data, dict):
+        return "Payload JSON non valido."
+
+    external_id = (data.get("external_id") or "").strip()
+    if not external_id:
+        return "Campo obbligatorio mancante: external_id."
+
+    location_id = (data.get("location_id") or "").strip()
+    if not location_id:
+        return "Campo obbligatorio mancante: location_id."
+
+    contact = data.get("contact")
+    if not isinstance(contact, dict):
+        return "Campo obbligatorio mancante: contact."
+
+    emails = _normalize_emails(contact)
+    if not emails:
+        return "Almeno un indirizzo email valido è richiesto in contact.communication.emails."
+
+    request_block = data.get("request")
+    if not isinstance(request_block, dict):
+        return "Campo obbligatorio mancante: request."
+
+    if not (request_block.get("request_type") or "").strip():
+        return "Campo obbligatorio mancante: request.request_type."
+
+    details = data.get("details")
+    if not isinstance(details, dict):
+        return "Campo obbligatorio mancante: details."
+
+    if not (details.get("type") or "").strip():
+        return "Campo obbligatorio mancante: details.type."
+
+    if not (details.get("status") or "").strip():
+        return "Campo obbligatorio mancante: details.status."
+
+    return None
+
+
+def run_create_partner_lead(data: Dict[str, Any]) -> LeadResult:
+    validation_error = _validate_payload(data)
+    if validation_error:
+        return LeadResult(ok=False, error=validation_error, status_code=400)
+
+    now = _utc_now_iso()
+    lead_id = _new_id()
+    contact_id = _new_id()
+
+    contact_in = data.get("contact") or {}
+    account_in = contact_in.get("account") or {}
+    request_in = data.get("request") or {}
+    details_in = data.get("details") or {}
+    source_in = details_in.get("source") or {}
+
+    source_detail = source_in.get("source_detail")
+    if source_detail is None or str(source_detail).strip() == "":
+        source_detail = "unknown"
+
+    payload = {
+        "id": lead_id,
+        "external_id": data.get("external_id"),
+        "channel": _CHANNEL,
+        "contact": {
+            "id": contact_id,
+            "first_name": contact_in.get("first_name") or "",
+            "last_name": contact_in.get("last_name") or "",
+            "account": {
+                "account_type": account_in.get("account_type") or "BUSINESS",
+                "company_name": account_in.get("company_name") or "",
+                "vat_code": account_in.get("vat_code"),
+                "fiscal_code": account_in.get("fiscal_code"),
+                "description": account_in.get("description"),
+            },
+            "communication": {
+                "emails": _normalize_emails(contact_in),
+                "phones": contact_in.get("communication", {}).get("phones") or [],
+                "addresses": contact_in.get("communication", {}).get("addresses") or [],
+            },
+            "title": contact_in.get("title") or "",
+            "gender": contact_in.get("gender") or "",
+            "birth_place": contact_in.get("birth_place") or "",
+            "language": contact_in.get("language") or "it",
+            "privacy": contact_in.get("privacy") or [],
+            "created_at": now,
+            "updated_at": now,
+        },
+        "request": {
+            "request_type": request_in.get("request_type"),
+            "requested_vehicle": _build_requested_vehicle(request_in.get("requested_vehicle") or {}),
+            "owned_vehicles": request_in.get("owned_vehicles") or [],
+            "trade_in_vehicles": request_in.get("trade_in_vehicles") or [],
+            "expected_purchase_date": request_in.get("expected_purchase_date"),
+            "description": request_in.get("description"),
+        },
+        "details": {
+            "type": details_in.get("type"),
+            "status": details_in.get("status"),
+            "closed_reason": details_in.get("closed_reason") or "",
+            "closed_at": details_in.get("closed_at"),
+            "source": {
+                "source": source_in.get("source") or "Other",
+                "source_detail": source_detail,
+            },
+            "campaign": details_in.get("campaign"),
+            "description": details_in.get("description") or "",
+        },
+        "facility": _build_facility(data.get("location_id")),
+        "imported_at": now,
+        "created_at": now,
+        "updated_at": now,
+        "appointment": data.get("appointment"),
+        "opportunity_id": data.get("opportunity_id"),
+    }
+
+    return LeadResult(ok=True, payload=payload, status_code=201)
