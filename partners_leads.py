@@ -33,11 +33,11 @@ def _channel() -> str:
 
 
 def _list_total() -> int:
-    raw = os.environ.get("PARTNERS_LEADS_TOTAL", "2316").strip()
+    raw = os.environ.get("PARTNERS_LEADS_TOTAL", "1").strip()
     try:
         return max(1, int(raw))
     except ValueError:
-        return 2316
+        return 1
 
 
 def _utc_now_iso() -> str:
@@ -79,8 +79,45 @@ def is_partners_leads_authorized(headers) -> bool:
     return False
 
 
+def _privacy_entry(
+    privacy_type: str,
+    channel: Optional[str],
+    updated_at: str,
+    *,
+    accepted: bool = True,
+) -> Dict[str, Any]:
+    return {
+        "type": privacy_type,
+        "accepted": accepted,
+        "channel": channel,
+        "updated_at": updated_at,
+    }
+
+
+def _default_email_privacy(updated_at: str) -> List[Dict[str, Any]]:
+    return [_privacy_entry("MARKETING", "EMAIL", updated_at)]
+
+
+def _default_phone_privacy(updated_at: str) -> List[Dict[str, Any]]:
+    return [
+        _privacy_entry("MARKETING", "CALL", updated_at),
+        _privacy_entry("MARKETING", "SMS", updated_at),
+    ]
+
+
+def _default_address_privacy(updated_at: str) -> List[Dict[str, Any]]:
+    return [_privacy_entry("MARKETING", "POSTAL", updated_at)]
+
+
+def _default_contact_privacy(updated_at: str) -> List[Dict[str, Any]]:
+    return [_privacy_entry("DATA_PROCESSING", None, updated_at)]
+
+
 def _normalize_privacy(
-    privacy_list: Optional[List[Any]], default_updated_at: str
+    privacy_list: Optional[List[Any]],
+    default_updated_at: str,
+    *,
+    default_if_empty: Optional[List[Dict[str, Any]]] = None,
 ) -> List[Dict[str, Any]]:
     privacy_out: List[Dict[str, Any]] = []
     for item in privacy_list or []:
@@ -94,7 +131,9 @@ def _normalize_privacy(
                 "updated_at": item.get("updated_at") or default_updated_at,
             }
         )
-    return privacy_out
+    if privacy_out:
+        return privacy_out
+    return deepcopy(default_if_empty) if default_if_empty else []
 
 
 def _normalize_emails(
@@ -113,7 +152,11 @@ def _normalize_emails(
         emails_out.append(
             {
                 "email": email,
-                "privacy": _normalize_privacy(item.get("privacy"), default_updated_at),
+                "privacy": _normalize_privacy(
+                    item.get("privacy"),
+                    default_updated_at,
+                    default_if_empty=_default_email_privacy(default_updated_at),
+                ),
                 "type": item.get("type") or "PRIVATE",
             }
         )
@@ -137,7 +180,11 @@ def _normalize_phones(
         phones_out.append(
             {
                 "phone_number": phone_number,
-                "privacy": _normalize_privacy(item.get("privacy"), default_updated_at),
+                "privacy": _normalize_privacy(
+                    item.get("privacy"),
+                    default_updated_at,
+                    default_if_empty=_default_phone_privacy(default_updated_at),
+                ),
                 "type": item.get("type") or "PRIVATE",
                 "phone_type": item.get("phone_type") or "MOBILE",
             }
@@ -165,7 +212,11 @@ def _normalize_addresses(
                 "street_2": item.get("street_2") or "",
                 "country": item.get("country") or "",
                 "type": item.get("type") or "UNKNOWN",
-                "privacy": _normalize_privacy(item.get("privacy"), default_updated_at),
+                "privacy": _normalize_privacy(
+                    item.get("privacy"),
+                    default_updated_at,
+                    default_if_empty=_default_address_privacy(default_updated_at),
+                ),
             }
         )
 
@@ -189,9 +240,18 @@ def _build_account(
     }
 
 
-def _build_campaign(campaign_in: Any) -> Optional[Dict[str, str]]:
+def _default_campaign() -> Dict[str, str]:
+    return {
+        "url": "",
+        "name": os.environ.get("PARTNERS_LEADS_DEFAULT_CAMPAIGN_NAME", "nome campagna test").strip(),
+        "reference": "",
+        "description": "",
+    }
+
+
+def _build_campaign(campaign_in: Any) -> Dict[str, str]:
     if campaign_in is None:
-        return None
+        return _default_campaign()
     if isinstance(campaign_in, str):
         return {
             "url": "",
@@ -200,11 +260,11 @@ def _build_campaign(campaign_in: Any) -> Optional[Dict[str, str]]:
             "description": "",
         }
     if not isinstance(campaign_in, dict):
-        return None
+        return _default_campaign()
 
     return {
         "url": campaign_in.get("url") or "",
-        "name": campaign_in.get("name") or "",
+        "name": campaign_in.get("name") or _default_campaign()["name"],
         "reference": campaign_in.get("reference") or "",
         "description": campaign_in.get("description") or "",
     }
@@ -297,7 +357,32 @@ def _default_last_name() -> str:
 
 
 def _default_email() -> str:
-    return os.environ.get("PARTNERS_LEADS_DEFAULT_EMAIL", "lead@example.com").strip()
+    return os.environ.get("PARTNERS_LEADS_DEFAULT_EMAIL", "s.sampietro@gmail.com").strip()
+
+
+def _default_phone() -> str:
+    return os.environ.get("PARTNERS_LEADS_DEFAULT_PHONE", "+393356894033").strip()
+
+
+def _default_address() -> Dict[str, str]:
+    return {
+        "city": os.environ.get("PARTNERS_LEADS_DEFAULT_ADDRESS_CITY", "Roma").strip(),
+        "region": os.environ.get("PARTNERS_LEADS_DEFAULT_ADDRESS_REGION", "Roma").strip(),
+        "postal_code": os.environ.get("PARTNERS_LEADS_DEFAULT_ADDRESS_POSTAL_CODE", "149").strip(),
+        "street": "",
+        "street_2": "",
+        "country": os.environ.get("PARTNERS_LEADS_DEFAULT_ADDRESS_COUNTRY", "IT").strip(),
+        "type": "UNKNOWN",
+    }
+
+
+def _default_source() -> Dict[str, str]:
+    return {
+        "source": os.environ.get("PARTNERS_LEADS_DEFAULT_SOURCE", "Third Party").strip(),
+        "source_detail": os.environ.get(
+            "PARTNERS_LEADS_DEFAULT_SOURCE_DETAIL", "Official Website Access"
+        ).strip(),
+    }
 
 
 def _query_value(args: Any, key: str, default: str = "") -> str:
@@ -317,12 +402,14 @@ def _query_value_first(args: Any, *keys: str, default: str = "") -> str:
 
 def _payload_from_query(args: Any) -> Dict[str, Any]:
     email = _query_value(args, "email") or _default_email()
-    phone = _query_value(args, "phone")
+    phone = _query_value(args, "phone") or _default_phone()
     campaign_name = _query_value(args, "campaign_name")
     details_type = _query_value_first(args, "type", "details_type", default="SALES")
     details_status = _query_value_first(args, "status", "details_status", default="VALID")
     page = _positive_int(args.get("page"), 1)
     size = _positive_int(args.get("limit") or args.get("size"), 1)
+    default_source = _default_source()
+    default_address = _default_address()
 
     contact: Dict[str, Any] = {
         "first_name": _query_value(args, "first_name") or _default_first_name(),
@@ -335,17 +422,14 @@ def _payload_from_query(args: Any) -> Dict[str, Any]:
                     "email": email,
                 }
             ],
-            "phones": (
-                [
-                    {
-                        "phone_number": phone,
-                        "type": _query_value(args, "phone_type") or "PRIVATE",
-                        "phone_type": _query_value(args, "phone_phone_type") or "MOBILE",
-                    }
-                ]
-                if phone
-                else []
-            ),
+            "phones": [
+                {
+                    "phone_number": phone,
+                    "type": _query_value(args, "phone_type") or "PRIVATE",
+                    "phone_type": _query_value(args, "phone_phone_type") or "MOBILE",
+                }
+            ],
+            "addresses": [default_address],
         },
     }
 
@@ -353,12 +437,18 @@ def _payload_from_query(args: Any) -> Dict[str, Any]:
         "type": details_type,
         "status": details_status,
         "source": {
-            "source": _query_value(args, "source") or "Other",
-            "source_detail": _query_value(args, "source_detail") or None,
+            "source": _query_value(args, "source") or default_source["source"],
+            "source_detail": _query_value(args, "source_detail") or default_source["source_detail"],
         },
+        "campaign": (
+            {
+                "url": _query_value(args, "campaign_url"),
+                "name": campaign_name or _default_campaign()["name"],
+                "reference": _query_value(args, "campaign_reference"),
+                "description": _query_value(args, "campaign_description"),
+            }
+        ),
     }
-    if campaign_name:
-        details["campaign"] = {"name": campaign_name}
 
     channel = _query_value(args, "channel")
 
@@ -374,8 +464,8 @@ def _payload_from_query(args: Any) -> Dict[str, Any]:
             "expected_purchase_date": None,
             "requested_vehicle": {
                 "vehicle_type": _query_value(args, "vehicle_type") or "NEW",
-                "make": _query_value_first(args, "vehicle_make", "make", default="Omoda"),
-                "model": _query_value_first(args, "vehicle_model", "model", default="OMODA 5"),
+                "make": _query_value_first(args, "vehicle_make", "make", default="Lepas"),
+                "model": _query_value_first(args, "vehicle_model", "model", default="Lepas 1"),
                 "version": _query_value_first(args, "vehicle_version", "version"),
             },
         },
@@ -425,7 +515,7 @@ def _build_lead_from_payload(data: Dict[str, Any]) -> LeadResult:
 
     source_detail = source_in.get("source_detail")
     if source_detail is None or str(source_detail).strip() == "":
-        source_detail = "unknown"
+        source_detail = _default_source()["source_detail"]
 
     lead = {
         "id": lead_id,
@@ -445,7 +535,11 @@ def _build_lead_from_payload(data: Dict[str, Any]) -> LeadResult:
             "gender": contact_in.get("gender") or "",
             "birth_place": contact_in.get("birth_place") or "",
             "language": contact_in.get("language") or "it",
-            "privacy": _normalize_privacy(contact_in.get("privacy"), created_at),
+            "privacy": _normalize_privacy(
+                contact_in.get("privacy"),
+                created_at,
+                default_if_empty=_default_contact_privacy(created_at),
+            ),
             "created_at": imported_at,
             "updated_at": imported_at,
         },
@@ -463,7 +557,7 @@ def _build_lead_from_payload(data: Dict[str, Any]) -> LeadResult:
             "closed_reason": details_in.get("closed_reason") or "",
             "closed_at": details_in.get("closed_at"),
             "source": {
-                "source": source_in.get("source") or "Other",
+                "source": source_in.get("source") or _default_source()["source"],
                 "source_detail": source_detail,
             },
             "campaign": _build_campaign(details_in.get("campaign")),

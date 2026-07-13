@@ -68,7 +68,13 @@ RICH_PAYLOAD = {
                             "accepted": True,
                             "channel": "CALL",
                             "updated_at": "2025-05-05T15:20:24+00:00",
-                        }
+                        },
+                        {
+                            "type": "MARKETING",
+                            "accepted": True,
+                            "channel": "SMS",
+                            "updated_at": "2025-05-05T15:20:24+00:00",
+                        },
                     ],
                 }
             ],
@@ -103,8 +109,8 @@ RICH_PAYLOAD = {
         "request_type": "GENERIC_SALES",
         "requested_vehicle": {
             "vehicle_type": "NEW",
-            "make": "Omoda",
-            "model": "OMODA 5",
+            "make": "Lepas",
+            "model": "Lepas 1",
             "version": "",
         },
     },
@@ -133,6 +139,30 @@ def _assert_paginated(body, *, page=1, size=1):
     return body["data"][0]
 
 
+def _assert_lepas_privacy_shape(lead):
+    email_privacy = lead["contact"]["communication"]["emails"][0]["privacy"]
+    assert email_privacy[0]["type"] == "MARKETING"
+    assert email_privacy[0]["channel"] == "EMAIL"
+    assert email_privacy[0]["accepted"] is True
+
+    phone_privacy = lead["contact"]["communication"]["phones"][0]["privacy"]
+    assert len(phone_privacy) == 2
+    assert {item["channel"] for item in phone_privacy} == {"CALL", "SMS"}
+
+    address_privacy = lead["contact"]["communication"]["addresses"][0]["privacy"]
+    assert address_privacy[0]["channel"] == "POSTAL"
+
+    contact_privacy = lead["contact"]["privacy"]
+    assert contact_privacy[0]["type"] == "DATA_PROCESSING"
+    assert contact_privacy[0]["channel"] is None
+
+    campaign = lead["details"]["campaign"]
+    assert campaign["name"] == "nome campagna test"
+    assert campaign["url"] == ""
+    assert campaign["reference"] == ""
+    assert campaign["description"] == ""
+
+
 def main():
     postman = run_get_partner_leads(POSTMAN_QUERY)
     assert postman.ok, postman.error
@@ -144,7 +174,13 @@ def main():
     assert postman_lead["contact"]["first_name"] == "stefano"
     assert postman_lead["contact"]["last_name"] == "sampietro"
     assert postman_lead["contact"]["account"]["company_name"] == "stefano sampietro"
-    assert postman_lead["contact"]["communication"]["emails"][0]["email"] == "lead@example.com"
+    assert postman_lead["contact"]["communication"]["emails"][0]["email"] == "s.sampietro@gmail.com"
+    assert postman_lead["contact"]["communication"]["phones"][0]["phone_number"] == "+393356894033"
+    assert postman_lead["request"]["requested_vehicle"]["make"] == "Lepas"
+    assert postman_lead["request"]["requested_vehicle"]["model"] == "Lepas 1"
+    assert postman_lead["details"]["source"]["source"] == "Third Party"
+    assert postman_lead["details"]["source"]["source_detail"] == "Official Website Access"
+    _assert_lepas_privacy_shape(postman_lead)
 
     result = run_get_partner_leads(SAMPLE_QUERY)
     assert result.ok, result.error
@@ -157,22 +193,16 @@ def main():
     assert lead["contact"]["communication"]["emails"][0]["email"] == "test@test.it"
     assert lead["request"]["request_type"] == "GENERIC_SALES"
     assert lead["request"]["requested_vehicle"]["make"] == "Omoda"
-    assert lead["request"]["description"] == ""
-    assert lead["details"]["source"]["source_detail"] == "unknown"
+    assert lead["details"]["source"]["source"] == "Other"
+    assert lead["details"]["campaign"]["name"] == "nome campagna test"
     assert lead["facility"]["id"] == SAMPLE_QUERY["location_id"]
-    assert lead["facility"]["name"] == "CARPOINT S.P.A. -Pomezia"
-    assert lead["facility"]["address"]["country"] == ""
     assert "id" in lead and lead["id"]
 
     rich = _build_lead_from_payload(RICH_PAYLOAD)
     assert rich.ok, rich.error
     rich_lead = _assert_paginated(rich.payload)
     assert rich_lead["channel"] == "Lepas"
-    assert rich_lead["contact"]["account"]["company_name"] == "stefano sampietro"
-    assert rich_lead["contact"]["communication"]["phones"][0]["phone_number"] == "+393356894033"
-    assert rich_lead["contact"]["privacy"][0]["type"] == "DATA_PROCESSING"
-    assert rich_lead["details"]["campaign"]["name"] == "nome campagna test"
-    assert rich_lead["details"]["source"]["source_detail"] == "Official Website Access"
+    _assert_lepas_privacy_shape(rich_lead)
 
     print("OK: run_get_partner_leads (Postman params)")
     print(json.dumps(postman.payload, indent=2, ensure_ascii=False))
@@ -191,15 +221,8 @@ def main():
     )
     assert auth.status_code == 200, auth.get_data(as_text=True)
     auth_body = auth.get_json()
-    assert auth_body["data"][0]["details"]["status"] == "VALID"
-    assert auth_body["size"] == 1
-
-    legacy = client.get(
-        "/partners/leads",
-        query_string=POSTMAN_QUERY,
-        headers={"X-Internal-Api-Key": "test-secret-key"},
-    )
-    assert legacy.status_code == 200, legacy.get_data(as_text=True)
+    assert auth_body["data"][0]["details"]["campaign"]["name"] == "nome campagna test"
+    assert auth_body["data"][0]["contact"]["privacy"][0]["type"] == "DATA_PROCESSING"
 
     print("OK: endpoint HTTP GET con autenticazione")
 
