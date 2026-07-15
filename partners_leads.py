@@ -243,7 +243,7 @@ def _build_account(
 def _default_campaign() -> Dict[str, str]:
     return {
         "url": "",
-        "name": os.environ.get("PARTNERS_LEADS_DEFAULT_CAMPAIGN_NAME", "nome campagna test").strip(),
+        "name": os.environ.get("PARTNERS_LEADS_DEFAULT_CAMPAIGN_NAME", "nome campagna test2").strip(),
         "reference": "",
         "description": "",
     }
@@ -349,7 +349,7 @@ def _default_external_id() -> str:
 
 
 def _default_first_name() -> str:
-    return os.environ.get("PARTNERS_LEADS_DEFAULT_FIRST_NAME", "stefano").strip()
+    return os.environ.get("PARTNERS_LEADS_DEFAULT_FIRST_NAME", "test").strip()
 
 
 def _default_last_name() -> str:
@@ -357,11 +357,11 @@ def _default_last_name() -> str:
 
 
 def _default_email() -> str:
-    return os.environ.get("PARTNERS_LEADS_DEFAULT_EMAIL", "s.sampietro@gmail.com").strip()
+    return os.environ.get("PARTNERS_LEADS_DEFAULT_EMAIL", "test@test.it").strip()
 
 
 def _default_phone() -> str:
-    return os.environ.get("PARTNERS_LEADS_DEFAULT_PHONE", "+393356894033").strip()
+    return os.environ.get("PARTNERS_LEADS_DEFAULT_PHONE", "+393333333333").strip()
 
 
 def _default_address() -> Dict[str, str]:

@@ -66,9 +66,11 @@ Configurazione: **servizio hmonitor → Environment** (tab *Environment* nel men
 | `PARTNERS_LEADS_CHANNEL` | No | Default: `Lepas` |
 | `PARTNERS_LEADS_TOTAL` | No | **Importante:** per lo stub a 1 record usare `1`. Valori alti fanno paginare il sistema chiamante |
 | `PARTNERS_LEADS_DEFAULT_LOCATION_ID` | No | UUID concessionaria (default CARPOINT Pomezia) |
-| `PARTNERS_LEADS_DEFAULT_FIRST_NAME` | No | Default contatto: `stefano` |
+| `PARTNERS_LEADS_DEFAULT_FIRST_NAME` | No | Default contatto: `test` |
 | `PARTNERS_LEADS_DEFAULT_LAST_NAME` | No | Default contatto: `sampietro` |
-| `PARTNERS_LEADS_DEFAULT_EMAIL` | No | Default email stub |
+| `PARTNERS_LEADS_DEFAULT_EMAIL` | No | Default email stub (`test@test.it`) |
+| `PARTNERS_LEADS_DEFAULT_PHONE` | No | Default telefono stub (`+393333333333`) |
+| `PARTNERS_LEADS_DEFAULT_CAMPAIGN_NAME` | No | Default campaign name (`nome campagna test2`) |
 | `PORT` | No | **Non impostare manualmente** su Render: la piattaforma la assegna |
 
 Dopo ogni modifica alle variabili, Render riavvia il servizio.

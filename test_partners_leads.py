@@ -123,7 +123,7 @@ RICH_PAYLOAD = {
         },
         "campaign": {
             "url": "",
-            "name": "nome campagna test",
+            "name": "nome campagna test2",
             "reference": "",
             "description": "",
         },
@@ -157,7 +157,7 @@ def _assert_lepas_privacy_shape(lead):
     assert contact_privacy[0]["channel"] is None
 
     campaign = lead["details"]["campaign"]
-    assert campaign["name"] == "nome campagna test"
+    assert campaign["name"] == "nome campagna test2"
     assert campaign["url"] == ""
     assert campaign["reference"] == ""
     assert campaign["description"] == ""
@@ -171,11 +171,11 @@ def main():
     assert postman_lead["details"]["type"] == "SALES"
     assert postman_lead["details"]["status"] == "VALID"
     assert postman_lead["facility"]["id"] == "5fb4c022-8c7d-43dc-bf6d-3f1d4b19a26f"
-    assert postman_lead["contact"]["first_name"] == "stefano"
+    assert postman_lead["contact"]["first_name"] == "test"
     assert postman_lead["contact"]["last_name"] == "sampietro"
-    assert postman_lead["contact"]["account"]["company_name"] == "stefano sampietro"
-    assert postman_lead["contact"]["communication"]["emails"][0]["email"] == "s.sampietro@gmail.com"
-    assert postman_lead["contact"]["communication"]["phones"][0]["phone_number"] == "+393356894033"
+    assert postman_lead["contact"]["account"]["company_name"] == "test sampietro"
+    assert postman_lead["contact"]["communication"]["emails"][0]["email"] == "test@test.it"
+    assert postman_lead["contact"]["communication"]["phones"][0]["phone_number"] == "+393333333333"
     assert postman_lead["request"]["requested_vehicle"]["make"] == "Lepas"
     assert postman_lead["request"]["requested_vehicle"]["model"] == "Lepas 1"
     assert postman_lead["details"]["source"]["source"] == "Third Party"
@@ -194,7 +194,7 @@ def main():
     assert lead["request"]["request_type"] == "GENERIC_SALES"
     assert lead["request"]["requested_vehicle"]["make"] == "Omoda"
     assert lead["details"]["source"]["source"] == "Other"
-    assert lead["details"]["campaign"]["name"] == "nome campagna test"
+    assert lead["details"]["campaign"]["name"] == "nome campagna test2"
     assert lead["facility"]["id"] == SAMPLE_QUERY["location_id"]
     assert "id" in lead and lead["id"]
 
@@ -221,7 +221,7 @@ def main():
     )
     assert auth.status_code == 200, auth.get_data(as_text=True)
     auth_body = auth.get_json()
-    assert auth_body["data"][0]["details"]["campaign"]["name"] == "nome campagna test"
+    assert auth_body["data"][0]["details"]["campaign"]["name"] == "nome campagna test2"
     assert auth_body["data"][0]["contact"]["privacy"][0]["type"] == "DATA_PROCESSING"
 
     print("OK: endpoint HTTP GET con autenticazione")
