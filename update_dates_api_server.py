@@ -14,7 +14,6 @@ import os
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 
-from partners_leads import is_partners_leads_authorized, run_get_partner_leads
 from update_request_dates import UpdateResult, run_update_request_dates
 
 DEFAULT_PORT = 8765
@@ -48,7 +47,7 @@ def root():
         {
             "status": "ok",
             "service": "update-request-dates",
-            "paths": ["/health", "/update", "/partners/leads"],
+            "paths": ["/health", "/update"],
         }
     )
 
@@ -67,18 +66,6 @@ def update():
     return jsonify(_serialize_result(result)), status
 
 
-@app.get("/partners/leads")
-def get_partner_leads():
-    if not is_partners_leads_authorized(request.headers):
-        return jsonify({"error": "Unauthorized"}), 401
-
-    result = run_get_partner_leads(request.args)
-    if not result.ok:
-        return jsonify({"error": result.error}), result.status_code
-
-    return jsonify(result.payload), result.status_code
-
-
 def main():
     # Render (e simili) impostano PORT; in locale si usa UPDATE_DATES_API_PORT o default.
     port = int(
@@ -87,8 +74,7 @@ def main():
     )
     host = "0.0.0.0" if os.environ.get("PORT") else "127.0.0.1"
     print(f"API aggiornamento date in ascolto su http://{host}:{port}")
-    print("  POST /update         JSON: {\"request_code\": \"V00000030814\"}")
-    print("  GET  /partners/leads (solo server-to-server, richiede PARTNERS_LEADS_API_KEY)")
+    print("  POST /update  JSON: {\"request_code\": \"V00000030814\"}")
     print("  GET  /health")
     app.run(host=host, port=port, threaded=True)
 
