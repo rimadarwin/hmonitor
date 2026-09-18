@@ -635,10 +635,12 @@ function formatChanges(changes) {
 function showScreen(name) {
   const home = document.getElementById("screenHome");
   const dates = document.getElementById("screenDates");
+  const canale = document.getElementById("screenCanale");
   const vt1 = document.getElementById("screenVt1");
   const wp1 = document.getElementById("screenWp1");
   home.classList.toggle("hidden", name !== "home");
   dates.classList.toggle("hidden", name !== "dates");
+  if (canale) canale.classList.toggle("hidden", name !== "canale");
   vt1.classList.toggle("hidden", name !== "vt1");
   if (wp1) wp1.classList.toggle("hidden", name !== "wp1");
 }
@@ -658,6 +660,7 @@ document.addEventListener("DOMContentLoaded", () => {
   let wp1VenditoreCache = "";
 
   const goDates = document.getElementById("goDates");
+  const goCanale = document.getElementById("goCanale");
   const goVt1 = document.getElementById("goVt1");
   const goWp1 = document.getElementById("goWp1");
   const requestCode = document.getElementById("requestCode");
@@ -665,6 +668,12 @@ document.addEventListener("DOMContentLoaded", () => {
   const statusDates = document.getElementById("statusDates");
   const logDates = document.getElementById("logDates");
   const backFromDates = document.getElementById("backFromDates");
+
+  const requestCodeCanale = document.getElementById("requestCodeCanale");
+  const runCanaleBtn = document.getElementById("runCanaleBtn");
+  const statusCanale = document.getElementById("statusCanale");
+  const logCanale = document.getElementById("logCanale");
+  const backFromCanale = document.getElementById("backFromCanale");
 
   const scrapeAgain = document.getElementById("scrapeAgain");
   const vt1Documentkey = document.getElementById("vt1Documentkey");
@@ -706,6 +715,7 @@ document.addEventListener("DOMContentLoaded", () => {
   wireOpenOptions(
     document.getElementById("openOptionsHome"),
     document.getElementById("openOptionsDates"),
+    document.getElementById("openOptionsCanale"),
     document.getElementById("openOptionsVt1"),
     document.getElementById("openOptionsVt1Auth"),
     document.getElementById("openOptionsWp1"),
@@ -780,6 +790,18 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 
+  goCanale.addEventListener("click", async () => {
+    showScreen("canale");
+    setStatus(statusCanale, "", "");
+    logCanale.classList.add("hidden");
+    try {
+      const s = await scrapeFromActiveTab();
+      if (s.documentkey) requestCodeCanale.value = s.documentkey;
+    } catch {
+      /* tab non accessibile o non in dettaglio richiesta */
+    }
+  });
+
   goVt1.addEventListener("click", async () => {
     showScreen("vt1");
     logVt1.classList.add("hidden");
@@ -797,6 +819,7 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   backFromDates.addEventListener("click", () => showScreen("home"));
+  backFromCanale.addEventListener("click", () => showScreen("home"));
   backFromVt1.addEventListener("click", () => showScreen("home"));
   backFromWp1.addEventListener("click", () => showScreen("home"));
 
@@ -849,6 +872,56 @@ document.addEventListener("DOMContentLoaded", () => {
       setStatus(statusDates, msg, "err");
     } finally {
       runBtn.disabled = false;
+    }
+  });
+
+  runCanaleBtn.addEventListener("click", async () => {
+    const code = requestCodeCanale.value.trim();
+    logCanale.classList.add("hidden");
+    logCanale.textContent = "";
+
+    if (!code) {
+      setStatus(statusCanale, "Inserisci il codice richiesta.", "err");
+      return;
+    }
+
+    runCanaleBtn.disabled = true;
+    setStatus(statusCanale, "Connessione al server…", "");
+
+    try {
+      const base = await getApiBase();
+      const res = await fetch(`${base}/switch-canale`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ request_code: code }),
+      });
+
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok || !data.ok) {
+        setStatus(
+          statusCanale,
+          data.error || data.message || `Errore HTTP ${res.status}`,
+          "err"
+        );
+        return;
+      }
+
+      const change = (data.changes || [])[0];
+      const msg = change
+        ? `Switch completato: ${change.vecchio} → ${change.nuovo}`
+        : "Switch completato.";
+      setStatus(statusCanale, msg, "ok");
+      logCanale.textContent = formatChanges(data.changes);
+      logCanale.classList.remove("hidden");
+    } catch (e) {
+      const msg =
+        e instanceof TypeError && String(e.message).includes("fetch")
+          ? "Impossibile contattare il server. Avvia update_dates_api_server.py o verifica l’URL Render."
+          : String(e.message || e);
+      setStatus(statusCanale, msg, "err");
+    } finally {
+      runCanaleBtn.disabled = false;
     }
   });
 

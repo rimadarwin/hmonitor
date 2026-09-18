@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Hera richieste — date e VT1",
-  "version": "1.5.1",
-  "description": "Aggiorna date su DB locale oppure invia flussi VT1.0150 / WP1 (VP1).0150 (inbound DLSII).",
+  "version": "1.6.0",
+  "description": "Aggiorna date, switch ATOA/FILE, oppure invia flussi VT1.0150 / WP1 (VP1).0150 (inbound DLSII).",
   "minimum_chrome_version": "114",
   "action": {
     "default_title": "Apri pannello operazioni (a destra)"

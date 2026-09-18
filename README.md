@@ -83,6 +83,16 @@ Usato dall’estensione Chrome per aggiornare le date di una richiesta.
 { "request_code": "V00000030814" }
 ```
 
+### `POST /switch-canale`
+
+Switch di `amc.request.canale_com` tra `ATOA` e `FILE` in base al valore corrente.
+
+```json
+{ "request_code": "V00000030814" }
+```
+
+Risposta con log `changes` (prima/dopo), stesso formato di `/update`.
+
 ---
 
 ## Estensione Chrome (`chrome-extension-update-dates/`)
@@ -90,6 +100,7 @@ Usato dall’estensione Chrome per aggiornare le date di una richiesta.
 | Flusso | Endpoint | Auth |
 |---|---|---|
 | Aggiorna date | `POST {apiBaseUrl}/update` su Render | Nessuna |
+| Switch ATOA/FILE | `POST {apiBaseUrl}/switch-canale` | Nessuna |
 | VT1 ELE 150 | `POST` su Heroku DLSII inboundflow | Bearer/Basic + cookie |
 | WP1 ELE 150 | Stesso endpoint VT1 | Stesse credenziali VT1 |
 
@@ -105,6 +116,7 @@ Dopo modifiche: `chrome://extensions` → **Ricarica**.
 app.py
 update_dates_api_server.py
 update_request_dates.py
+switch_canale_com.py
 chrome-extension-update-dates/
 Procfile
 requirements.txt

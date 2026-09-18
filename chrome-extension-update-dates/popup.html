@@ -13,6 +13,7 @@
       <h1>Operazioni</h1>
       <p class="hint">Scegli l’azione. Per VT1 / WP1 apri il dettaglio richiesta nel tab attivo prima di cliccare.</p>
       <button type="button" id="goDates" class="choice primary">Aggiorna data</button>
+      <button type="button" id="goCanale" class="choice primary">Switch ATOA/FILE</button>
       <button type="button" id="goVt1" class="choice accent">VT1 ELE 150</button>
       <button type="button" id="goWp1" class="choice accent">WP1 ELE 150</button>
       <p class="footer">
@@ -36,6 +37,25 @@
       <button type="button" id="backFromDates" class="linkish">← Indietro</button>
       <p class="footer tight">
         <a href="#" id="openOptionsDates">Impostazioni API locale</a>
+      </p>
+    </section>
+
+    <!-- Switch canale_com ATOA <-> FILE -->
+    <section id="screenCanale" class="hidden">
+      <h1>Switch ATOA / FILE</h1>
+      <p class="hint">
+        Inverte <code>canale_com</code> su <code>amc.request</code>: ATOA → FILE oppure FILE → ATOA.
+      </p>
+      <label class="field">
+        <span>Codice richiesta</span>
+        <input type="text" id="requestCodeCanale" placeholder="es. V00000030814" autocomplete="off" spellcheck="false" />
+      </label>
+      <button type="button" id="runCanaleBtn" class="primary">Esegui switch</button>
+      <div id="statusCanale" class="status" aria-live="polite"></div>
+      <pre id="logCanale" class="log hidden"></pre>
+      <button type="button" id="backFromCanale" class="linkish">← Indietro</button>
+      <p class="footer tight">
+        <a href="#" id="openOptionsCanale">Impostazioni API locale</a>
       </p>
     </section>
 

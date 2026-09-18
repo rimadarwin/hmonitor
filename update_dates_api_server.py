@@ -15,6 +15,7 @@ from flask import Flask, jsonify, request
 from flask_cors import CORS
 
 from update_request_dates import UpdateResult, run_update_request_dates
+from switch_canale_com import run_switch_canale_com
 
 DEFAULT_PORT = 8765
 
@@ -49,7 +50,7 @@ def root():
         {
             "status": "ok",
             "service": "update-request-dates",
-            "paths": ["/health", "/update"],
+            "paths": ["/health", "/update", "/switch-canale"],
         }
     )
 
@@ -68,6 +69,16 @@ def update():
     return jsonify(_serialize_result(result)), status
 
 
+@app.post("/switch-canale")
+def switch_canale():
+    """Switch canale_com ATOA <-> FILE su amc.request."""
+    data = request.get_json(silent=True) or {}
+    request_code = data.get("request_code", "")
+    result = run_switch_canale_com(request_code)
+    status = 200 if result.ok else 400
+    return jsonify(_serialize_result(result)), status
+
+
 def main():
     # Render (e simili) impostano PORT; in locale si usa UPDATE_DATES_API_PORT o default.
     port = int(
@@ -76,7 +87,8 @@ def main():
     )
     host = "0.0.0.0" if os.environ.get("PORT") else "127.0.0.1"
     print(f"API aggiornamento date in ascolto su http://{host}:{port}")
-    print("  POST /update  JSON: {\"request_code\": \"V00000030814\"}")
+    print("  POST /update         JSON: {\"request_code\": \"V00000030814\"}")
+    print("  POST /switch-canale  JSON: {\"request_code\": \"V00000030814\"}")
     print("  GET  /health")
     app.run(host=host, port=port, threaded=True)
 
