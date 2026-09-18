@@ -11,9 +11,10 @@
     <!-- Home: scelta azione -->
     <section id="screenHome">
       <h1>Operazioni</h1>
-      <p class="hint">Scegli l’azione. Per VT1 apri il dettaglio richiesta nel tab attivo prima di cliccare.</p>
+      <p class="hint">Scegli l’azione. Per VT1 / WP1 apri il dettaglio richiesta nel tab attivo prima di cliccare.</p>
       <button type="button" id="goDates" class="choice primary">Aggiorna data</button>
       <button type="button" id="goVt1" class="choice accent">VT1 ELE 150</button>
+      <button type="button" id="goWp1" class="choice accent">WP1 ELE 150</button>
       <p class="footer">
         <a href="#" id="openOptionsHome">Impostazioni</a>
       </p>
@@ -94,7 +95,79 @@
       <pre id="logVt1" class="log hidden"></pre>
       <button type="button" id="backFromVt1" class="linkish">← Indietro</button>
       <p class="footer tight">
-        <a href="#" id="openOptionsVt1">URL servizio e segreti</a>
+        <a href="#" id="openOptionsVt1">Impostazioni</a>
+      </p>
+    </section>
+
+    <!-- WP1 (VP1) inbound flusso 0150 — elettrico -->
+    <section id="screenWp1" class="hidden">
+      <h1>WP1 · flusso 0150 (VP1)</h1>
+      <p class="hint">Stesso endpoint VT1. Campi elettrici e anagrafica base letti dal dettaglio richiesta.</p>
+      <button type="button" id="scrapeAgainWp1" class="secondary full">Refresh dati</button>
+      <label class="field">
+        <span>DOCUMENTKEY</span>
+        <input type="text" id="wp1Documentkey" autocomplete="off" spellcheck="false" />
+      </label>
+      <label class="field">
+        <span>RIF_EXT (Codice pratica SII)</span>
+        <input type="text" id="wp1RifExt" autocomplete="off" spellcheck="false" />
+      </label>
+      <label class="field">
+        <span>POD</span>
+        <input type="text" id="wp1Pod" autocomplete="off" spellcheck="false" />
+      </label>
+      <label class="field">
+        <span>COD_PRESTAZ</span>
+        <input type="text" id="wp1CodPrestaz" autocomplete="off" spellcheck="false" />
+      </label>
+      <p class="subhint">Dati tecnici (solo manuale; non letti dalla pagina)</p>
+      <label class="field">
+        <span>EXT_DT_DECOR_D (invio sempre come AAAAMMGG)</span>
+        <input type="text" id="wp1ExtDtDecor" autocomplete="off" spellcheck="false" maxlength="32" />
+      </label>
+      <label class="field">
+        <span>EXT_STATO_RICHIESTA (fisso)</span>
+        <input type="text" id="wp1ExtStato" autocomplete="off" spellcheck="false" readonly tabindex="-1" value="1" />
+      </label>
+      <label class="field">
+        <span>EXT_POT_IMP</span>
+        <input type="text" id="wp1PotImp" autocomplete="off" spellcheck="false" />
+      </label>
+      <label class="field">
+        <span>EXT_POT_DISP</span>
+        <input type="text" id="wp1PotDisp" autocomplete="off" spellcheck="false" />
+      </label>
+      <label class="field">
+        <span>EXT_OPZ_TARIFFA</span>
+        <input type="text" id="wp1OpzTariffa" autocomplete="off" spellcheck="false" />
+      </label>
+      <label class="field">
+        <span>EXT_TENS_FASE</span>
+        <input type="text" id="wp1TensFase" autocomplete="off" spellcheck="false" />
+      </label>
+      <label class="field">
+        <span>EXT_TENS_ALIM</span>
+        <input type="text" id="wp1TensAlim" autocomplete="off" spellcheck="false" />
+      </label>
+      <p class="hint vt1-auth-hint">
+        <strong>Authorization</strong> e cookie: stesse impostazioni VT1 in
+        <a href="#" id="openOptionsWp1Auth">Impostazioni</a>.
+      </p>
+      <label class="field">
+        <span>Cookie (opzionale, es. JSESSIONID=…)</span>
+        <input type="text" id="wp1Cookie" autocomplete="off" spellcheck="false" />
+      </label>
+      <label class="field">
+        <span>Corpo JSON</span>
+        <textarea id="wp1Json" rows="10" spellcheck="false"></textarea>
+      </label>
+      <button type="button" id="wp1ApplyFields" class="secondary full">Aggiorna JSON dai campi sopra</button>
+      <button type="button" id="wp1Send" class="primary">Invia richiesta</button>
+      <div id="statusWp1" class="status" aria-live="polite"></div>
+      <pre id="logWp1" class="log hidden"></pre>
+      <button type="button" id="backFromWp1" class="linkish">← Indietro</button>
+      <p class="footer tight">
+        <a href="#" id="openOptionsWp1">Impostazioni</a>
       </p>
     </section>
   </main>

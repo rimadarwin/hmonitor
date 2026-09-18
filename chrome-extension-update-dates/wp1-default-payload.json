@@ -1,0 +1,42 @@
+{
+  "stagingAreaDLScartiTestataId": null,
+  "evento": null,
+  "prestazione": {
+    "header": {
+      "distributore": "PA_DS13D00000AU",
+      "venditore": "PA_VT13V0000000",
+      "causale": "VP1",
+      "flusso": "0150",
+      "user": "BS_030_001",
+      "servizio": "VP1",
+      "operazione": "VP1.0150",
+      "erogatore": "UT0261",
+      "fruitore": "AU",
+      "esito": null,
+      "descrizioneEsito": null,
+      "namespace": null
+    },
+    "requests": [
+      {
+        "fields": [
+          { "field": "CODCAUS", "value": "VP1" },
+          { "field": "COD_FLUSSO", "value": "0150" },
+          { "field": "PIVA_MITT", "value": "02221101203" },
+          { "field": "PIVA_DEST", "value": "05877611003" },
+          { "field": "DOCUMENTKEY", "value": "" },
+          { "field": "RIF_EXT", "value": "" },
+          { "field": "POD", "value": "" },
+          { "field": "COD_PRESTAZ", "value": "PV1" },
+          { "field": "EXT_DT_DECOR_D", "value": "" },
+          { "field": "EXT_STATO_RICHIESTA", "value": "1" },
+          { "field": "EXT_POT_IMP", "value": "6.0" },
+          { "field": "EXT_POT_DISP", "value": "6.600" },
+          { "field": "EXT_OPZ_TARIFFA", "value": "TD" },
+          { "field": "EXT_TENS_FASE", "value": "BT_MONOFASE" },
+          { "field": "EXT_TENS_ALIM", "value": "230" }
+        ]
+      }
+    ],
+    "strutturaRipetibile": null
+  }
+}

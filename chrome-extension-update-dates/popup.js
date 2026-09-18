@@ -11,6 +11,68 @@ function todayYYYYMMDD() {
   return `${y}${m}${day}`;
 }
 
+/**
+ * Converte testo letto dalla pagina (o digitato) in AAAAMMGG per EXT_DT_DECOR_D.
+ * Accetta già AAAAMMGG, DD/MM/YYYY, DD-MM-YYYY, YYYY-MM-DD e altre stringhe parseabili.
+ */
+function normalizeDateToYYYYMMDD(raw) {
+  const s = (raw == null ? "" : String(raw))
+    .trim()
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!s) return "";
+  const compact = s.replace(/\s/g, "");
+  if (/^\d{8}$/.test(compact)) {
+    const y = parseInt(compact.slice(0, 4), 10);
+    const m = parseInt(compact.slice(4, 6), 10);
+    const d = parseInt(compact.slice(6, 8), 10);
+    if (y >= 1990 && y <= 2099 && m >= 1 && m <= 12 && d >= 1 && d <= 31) {
+      return compact;
+    }
+  }
+  const dmY = s.match(/^(\d{1,2})[/.-](\d{1,2})[/.-](\d{4})$/);
+  if (dmY) {
+    const d = parseInt(dmY[1], 10);
+    const m = parseInt(dmY[2], 10);
+    const y = parseInt(dmY[3], 10);
+    return `${y}${String(m).padStart(2, "0")}${String(d).padStart(2, "0")}`;
+  }
+  const ymd = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if (ymd) {
+    const y = parseInt(ymd[1], 10);
+    const m = parseInt(ymd[2], 10);
+    const d = parseInt(ymd[3], 10);
+    return `${y}${String(m).padStart(2, "0")}${String(d).padStart(2, "0")}`;
+  }
+  const ts = Date.parse(s);
+  if (!Number.isNaN(ts)) {
+    const dt = new Date(ts);
+    if (!Number.isNaN(dt.getTime())) {
+      const y = dt.getFullYear();
+      const m = String(dt.getMonth() + 1).padStart(2, "0");
+      const day = String(dt.getDate()).padStart(2, "0");
+      return `${y}${m}${day}`;
+    }
+  }
+  return "";
+}
+
+/** Stato fisso API; data in formato AAAAMMGG. */
+function normalizeWp1PayloadFields(payload) {
+  const p = typeof payload === "string" ? JSON.parse(payload) : payload;
+  const fields = p?.prestazione?.requests?.[0]?.fields;
+  if (!Array.isArray(fields)) return p;
+  for (const row of fields) {
+    if (row.field === "EXT_STATO_RICHIESTA") {
+      row.value = "1";
+    } else if (row.field === "EXT_DT_DECOR_D") {
+      const n = normalizeDateToYYYYMMDD(row.value);
+      row.value = n || todayYYYYMMDD();
+    }
+  }
+  return p;
+}
+
 async function getApiBase() {
   const { apiBaseUrl } = await chrome.storage.sync.get({
     apiBaseUrl: DEFAULT_API,
@@ -39,6 +101,12 @@ async function getVt1LocalForAuth() {
 async function loadDefaultVt1Payload() {
   const res = await fetch(chrome.runtime.getURL("vt1-default-payload.json"));
   if (!res.ok) throw new Error("Impossibile caricare il template JSON.");
+  return res.json();
+}
+
+async function loadDefaultWp1Payload() {
+  const res = await fetch(chrome.runtime.getURL("wp1-default-payload.json"));
+  if (!res.ok) throw new Error("Impossibile caricare il template WP1 JSON.");
   return res.json();
 }
 
@@ -96,6 +164,70 @@ function readTopFieldsFromPayload(payload) {
     extCognome: get("EXT_COGNOME"),
     extRagsoc: get("EXT_RAGSOC"),
     extCodFiscale: get("EXT_COD_FISCALE"),
+  };
+}
+
+function applyWp1FieldsToPayload(payload, values) {
+  const p = typeof payload === "string" ? JSON.parse(payload) : payload;
+  const fields = p?.prestazione?.requests?.[0]?.fields;
+  if (!Array.isArray(fields)) return p;
+  const decorOut =
+    normalizeDateToYYYYMMDD(values.extDtDecorD) || todayYYYYMMDD();
+  const map = {
+    DOCUMENTKEY: values.documentkey,
+    RIF_EXT: values.rif_ext,
+    POD: values.pod,
+    COD_PRESTAZ: values.codPrestaz,
+    EXT_DT_DECOR_D: decorOut,
+    EXT_STATO_RICHIESTA: "1",
+    EXT_POT_IMP: values.extPotImp,
+    EXT_POT_DISP: values.extPotDisp,
+    EXT_OPZ_TARIFFA: values.extOpzTariffa,
+    EXT_TENS_FASE: values.extTensFase,
+    EXT_TENS_ALIM: values.extTensAlim,
+  };
+  for (const row of fields) {
+    if (Object.prototype.hasOwnProperty.call(map, row.field)) {
+      const v = map[row.field];
+      row.value = v == null ? "" : String(v);
+    }
+  }
+  return normalizeWp1PayloadFields(p);
+}
+
+function readWp1FieldsFromPayload(payload) {
+  const fields = payload?.prestazione?.requests?.[0]?.fields;
+  if (!Array.isArray(fields)) {
+    return {
+      documentkey: "",
+      rif_ext: "",
+      pod: "",
+      codPrestaz: "",
+      extDtDecorD: "",
+      extPotImp: "",
+      extPotDisp: "",
+      extOpzTariffa: "",
+      extTensFase: "",
+      extTensAlim: "",
+    };
+  }
+  const get = (name) => {
+    const f = fields.find((x) => x.field === name);
+    return f ? String(f.value ?? "").trim() : "";
+  };
+  const rawDecor = get("EXT_DT_DECOR_D");
+  return {
+    documentkey: get("DOCUMENTKEY"),
+    rif_ext: get("RIF_EXT"),
+    pod: get("POD"),
+    codPrestaz: get("COD_PRESTAZ"),
+    extDtDecorD:
+      normalizeDateToYYYYMMDD(rawDecor) || rawDecor || todayYYYYMMDD(),
+    extPotImp: get("EXT_POT_IMP"),
+    extPotDisp: get("EXT_POT_DISP"),
+    extOpzTariffa: get("EXT_OPZ_TARIFFA"),
+    extTensFase: get("EXT_TENS_FASE"),
+    extTensAlim: get("EXT_TENS_ALIM"),
   };
 }
 
@@ -349,6 +481,14 @@ function scrapeRichiestaPage() {
     return cut.trim();
   }
 
+  function firstNonEmpty(...vals) {
+    for (const v of vals) {
+      const t = scrub(v).trim();
+      if (t) return t;
+    }
+    return "";
+  }
+
   return {
     documentkey,
     pod: getField("POD"),
@@ -358,6 +498,11 @@ function scrapeRichiestaPage() {
     extRagsoc: getField("Ragione Sociale"),
     extCodFiscale: getField("Codice Fiscale"),
     venditoreCodice: parseVenditoreCodice(getField("Venditore")),
+    extDtDecorD: firstNonEmpty(
+      getField("Data decorrenza"),
+      getField("Decorrenza"),
+      getField("EXT_DT_DECOR_D")
+    ),
   };
 }
 
@@ -392,6 +537,7 @@ async function scrapeFromActiveTab() {
       "extRagsoc",
       "extCodFiscale",
       "venditoreCodice",
+      "extDtDecorD",
     ];
     const out = {};
     for (const k of keys) {
@@ -443,6 +589,7 @@ async function scrapeFromActiveTab() {
     extRagsoc: t(raw.extRagsoc),
     extCodFiscale: t(raw.extCodFiscale),
     venditoreCodice: t(raw.venditoreCodice),
+    extDtDecorD: normalizeDateToYYYYMMDD(t(raw.extDtDecorD)),
   };
 }
 
@@ -460,7 +607,7 @@ function applyVenditoreToPayload(payload, venditoreCodice) {
   const row = fields.find((x) => x.field === "PIVA_MITT");
   if (!row) return;
   if (code === "13V0000170") {
-    row.value = "058776110032";
+    row.value = "00997630322";
   } else if (code === "13V0000000") {
     row.value = "02221101203";
   } else {
@@ -477,10 +624,11 @@ function setStatus(el, message, kind) {
 function formatChanges(changes) {
   if (!changes || !changes.length) return "(nessuna voce)";
   return changes
-    .map(
-      (c) =>
-        `[${c.tabella}] ${c.campo}\n  prima: ${c.vecchio}\n  dopo:  ${c.nuovo}`
-    )
+    .map((c) => {
+      const tag = c.skipped ? "SALTATO" : "OK";
+      const note = c.note ? `\n  nota:  ${c.note}` : "";
+      return `[${tag}] [${c.tabella}] ${c.campo}\n  prima: ${c.vecchio}\n  dopo:  ${c.nuovo}${note}`;
+    })
     .join("\n\n");
 }
 
@@ -488,9 +636,11 @@ function showScreen(name) {
   const home = document.getElementById("screenHome");
   const dates = document.getElementById("screenDates");
   const vt1 = document.getElementById("screenVt1");
+  const wp1 = document.getElementById("screenWp1");
   home.classList.toggle("hidden", name !== "home");
   dates.classList.toggle("hidden", name !== "dates");
   vt1.classList.toggle("hidden", name !== "vt1");
+  if (wp1) wp1.classList.toggle("hidden", name !== "wp1");
 }
 
 function wireOpenOptions(...links) {
@@ -505,9 +655,11 @@ function wireOpenOptions(...links) {
 document.addEventListener("DOMContentLoaded", () => {
   /** Ultimo codice venditore letto dalla pagina (per PIVA_MITT / header all’invio). */
   let vt1VenditoreCache = "";
+  let wp1VenditoreCache = "";
 
   const goDates = document.getElementById("goDates");
   const goVt1 = document.getElementById("goVt1");
+  const goWp1 = document.getElementById("goWp1");
   const requestCode = document.getElementById("requestCode");
   const runBtn = document.getElementById("runBtn");
   const statusDates = document.getElementById("statusDates");
@@ -531,11 +683,33 @@ document.addEventListener("DOMContentLoaded", () => {
   const logVt1 = document.getElementById("logVt1");
   const backFromVt1 = document.getElementById("backFromVt1");
 
+  const scrapeAgainWp1 = document.getElementById("scrapeAgainWp1");
+  const wp1Documentkey = document.getElementById("wp1Documentkey");
+  const wp1RifExt = document.getElementById("wp1RifExt");
+  const wp1Pod = document.getElementById("wp1Pod");
+  const wp1CodPrestaz = document.getElementById("wp1CodPrestaz");
+  const wp1ExtDtDecor = document.getElementById("wp1ExtDtDecor");
+  const wp1ExtStato = document.getElementById("wp1ExtStato");
+  const wp1PotImp = document.getElementById("wp1PotImp");
+  const wp1PotDisp = document.getElementById("wp1PotDisp");
+  const wp1OpzTariffa = document.getElementById("wp1OpzTariffa");
+  const wp1TensFase = document.getElementById("wp1TensFase");
+  const wp1TensAlim = document.getElementById("wp1TensAlim");
+  const wp1Cookie = document.getElementById("wp1Cookie");
+  const wp1Json = document.getElementById("wp1Json");
+  const wp1ApplyFields = document.getElementById("wp1ApplyFields");
+  const wp1Send = document.getElementById("wp1Send");
+  const statusWp1 = document.getElementById("statusWp1");
+  const logWp1 = document.getElementById("logWp1");
+  const backFromWp1 = document.getElementById("backFromWp1");
+
   wireOpenOptions(
     document.getElementById("openOptionsHome"),
     document.getElementById("openOptionsDates"),
     document.getElementById("openOptionsVt1"),
-    document.getElementById("openOptionsVt1Auth")
+    document.getElementById("openOptionsVt1Auth"),
+    document.getElementById("openOptionsWp1"),
+    document.getElementById("openOptionsWp1Auth")
   );
 
   function collectTopFormValues() {
@@ -562,6 +736,38 @@ document.addEventListener("DOMContentLoaded", () => {
     vt1Cf.value = top.extCodFiscale;
   }
 
+  function collectWp1FormValues() {
+    return {
+      documentkey: wp1Documentkey.value.trim(),
+      rif_ext: wp1RifExt.value.trim(),
+      pod: wp1Pod.value.trim(),
+      codPrestaz: wp1CodPrestaz.value.trim() || "PV1",
+      extDtDecorD: wp1ExtDtDecor.value.trim(),
+      extPotImp: wp1PotImp.value.trim(),
+      extPotDisp: wp1PotDisp.value.trim(),
+      extOpzTariffa: wp1OpzTariffa.value.trim(),
+      extTensFase: wp1TensFase.value.trim(),
+      extTensAlim: wp1TensAlim.value.trim(),
+    };
+  }
+
+  function fillWp1InputsFromTop(top) {
+    wp1Documentkey.value = top.documentkey;
+    wp1RifExt.value = top.rif_ext;
+    wp1Pod.value = top.pod;
+    wp1CodPrestaz.value = top.codPrestaz || "PV1";
+    wp1ExtDtDecor.value =
+      normalizeDateToYYYYMMDD(top.extDtDecorD) ||
+      top.extDtDecorD ||
+      todayYYYYMMDD();
+    wp1ExtStato.value = "1";
+    wp1PotImp.value = top.extPotImp;
+    wp1PotDisp.value = top.extPotDisp;
+    wp1OpzTariffa.value = top.extOpzTariffa;
+    wp1TensFase.value = top.extTensFase;
+    wp1TensAlim.value = top.extTensAlim;
+  }
+
   goDates.addEventListener("click", async () => {
     showScreen("dates");
     setStatus(statusDates, "", "");
@@ -582,8 +788,17 @@ document.addEventListener("DOMContentLoaded", () => {
     await populateVt1Screen(true);
   });
 
+  goWp1.addEventListener("click", async () => {
+    showScreen("wp1");
+    logWp1.classList.add("hidden");
+    logWp1.textContent = "";
+    setStatus(statusWp1, "Caricamento…", "");
+    await populateWp1Screen(true);
+  });
+
   backFromDates.addEventListener("click", () => showScreen("home"));
   backFromVt1.addEventListener("click", () => showScreen("home"));
+  backFromWp1.addEventListener("click", () => showScreen("home"));
 
   runBtn.addEventListener("click", async () => {
     const code = requestCode.value.trim();
@@ -617,7 +832,13 @@ document.addEventListener("DOMContentLoaded", () => {
         return;
       }
 
-      setStatus(statusDates, "Operazione completata.", "ok");
+      const skipped = (data.changes || []).filter((c) => c.skipped).length;
+      const updated = (data.changes || []).filter((c) => !c.skipped).length;
+      const statusMsg =
+        skipped > 0
+          ? `Operazione completata: ${updated} aggiornati, ${skipped} saltati (vedi log).`
+          : "Operazione completata.";
+      setStatus(statusDates, statusMsg, "ok");
       logDates.textContent = formatChanges(data.changes);
       logDates.classList.remove("hidden");
     } catch (e) {
@@ -736,6 +957,110 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
+  async function populateWp1Screen(doScrape) {
+    try {
+      const basePayload = await loadDefaultWp1Payload();
+      const payload = deepClone(basePayload);
+      payload.prestazione.requests[0].fields.forEach((row) => {
+        if (row.field === "EXT_DT_DECOR_D") row.value = todayYYYYMMDD();
+        if (row.field === "EXT_STATO_RICHIESTA") row.value = "1";
+      });
+
+      const emptyScrape = {
+        documentkey: "",
+        pod: "",
+        rif_ext: "",
+        venditoreCodice: "",
+        extDtDecorD: "",
+      };
+      let scraped = { ...emptyScrape };
+      let scrapeOk = false;
+      let scrapeErr = null;
+      if (doScrape) {
+        try {
+          scraped = await scrapeFromActiveTab();
+          scrapeOk = true;
+        } catch (err) {
+          scrapeErr = err;
+        }
+      }
+
+      if (scraped.documentkey) {
+        const f = payload.prestazione.requests[0].fields.find(
+          (x) => x.field === "DOCUMENTKEY"
+        );
+        if (f) f.value = scraped.documentkey;
+      }
+      if (scraped.rif_ext) {
+        const f = payload.prestazione.requests[0].fields.find(
+          (x) => x.field === "RIF_EXT"
+        );
+        if (f) f.value = scraped.rif_ext;
+      }
+      if (scraped.pod) {
+        const f = payload.prestazione.requests[0].fields.find(
+          (x) => x.field === "POD"
+        );
+        if (f) f.value = scraped.pod;
+      }
+
+      if (scrapeOk) {
+        const pairs = [["EXT_DT_DECOR_D", scraped.extDtDecorD]];
+        for (const [field, val] of pairs) {
+          if (val == null || String(val).trim() === "") continue;
+          const f = payload.prestazione.requests[0].fields.find(
+            (x) => x.field === field
+          );
+          if (f) {
+            if (field === "EXT_DT_DECOR_D") {
+              const nd = normalizeDateToYYYYMMDD(val);
+              if (nd) f.value = nd;
+            } else {
+              f.value = String(val).trim();
+            }
+          }
+        }
+      }
+
+      if (scrapeOk) {
+        wp1VenditoreCache = scraped.venditoreCodice || "";
+      }
+      applyVenditoreToPayload(payload, scraped.venditoreCodice);
+      normalizeWp1PayloadFields(payload);
+
+      const top = readWp1FieldsFromPayload(payload);
+      fillWp1InputsFromTop(top);
+
+      const sec = await getVt1LocalForAuth();
+      wp1Cookie.value = sec.vt1Cookie || "";
+
+      wp1Json.value = JSON.stringify(payload, null, 2);
+
+      if (scrapeErr) {
+        const em = String(scrapeErr.message || scrapeErr);
+        const extra =
+          /cannot access|access.*host|permission|denied|blocked/i.test(em)
+            ? " Concedi all’estensione l’accesso al sito (Chrome → estensione → permessi sito) oppure ricarica l’estensione."
+            : "";
+        setStatus(statusWp1, em + extra, "err");
+      } else {
+        const any = !!(
+          scraped.documentkey ||
+          scraped.pod ||
+          scraped.rif_ext ||
+          scraped.extDtDecorD ||
+          scraped.venditoreCodice
+        );
+        const hint = any
+          ? "Campi aggiornati dalla pagina. Controlla Authorization nelle impostazioni e invia."
+          : "Nessun dato letto dal tab (selettori non trovati). Compila a mano o riprova dal dettaglio richiesta.";
+        setStatus(statusWp1, hint, any ? "ok" : "err");
+      }
+    } catch (e) {
+      setStatus(statusWp1, String(e.message || e), "err");
+    }
+  }
+
   scrapeAgain.addEventListener("click", async () => {
     scrapeAgain.disabled = true;
     setStatus(statusVt1, "Lettura pagina…", "");
@@ -846,6 +1171,118 @@ document.addEventListener("DOMContentLoaded", () => {
       setStatus(statusVt1, String(e.message || e), "err");
     } finally {
       vt1Send.disabled = false;
+    }
+  });
+
+  scrapeAgainWp1.addEventListener("click", async () => {
+    scrapeAgainWp1.disabled = true;
+    setStatus(statusWp1, "Lettura pagina…", "");
+    try {
+      const scraped = await scrapeFromActiveTab();
+      wp1Documentkey.value = scraped.documentkey || wp1Documentkey.value;
+      wp1RifExt.value = scraped.rif_ext || wp1RifExt.value;
+      wp1Pod.value = scraped.pod || wp1Pod.value;
+      const decor = normalizeDateToYYYYMMDD(scraped.extDtDecorD);
+      if (decor) wp1ExtDtDecor.value = decor;
+      wp1ExtStato.value = "1";
+      let payload;
+      try {
+        payload = JSON.parse(wp1Json.value);
+      } catch {
+        payload = await loadDefaultWp1Payload();
+      }
+      applyWp1FieldsToPayload(payload, collectWp1FormValues());
+      if (scraped.venditoreCodice) wp1VenditoreCache = scraped.venditoreCodice;
+      applyVenditoreToPayload(payload, scraped.venditoreCodice);
+      wp1Json.value = JSON.stringify(payload, null, 2);
+      setStatus(statusWp1, "Lettura completata.", "ok");
+    } catch (e) {
+      setStatus(statusWp1, String(e.message || e), "err");
+    } finally {
+      scrapeAgainWp1.disabled = false;
+    }
+  });
+
+  wp1ApplyFields.addEventListener("click", () => {
+    try {
+      const payload = JSON.parse(wp1Json.value);
+      applyWp1FieldsToPayload(payload, collectWp1FormValues());
+      applyVenditoreToPayload(payload, wp1VenditoreCache);
+      wp1Json.value = JSON.stringify(payload, null, 2);
+      setStatus(statusWp1, "JSON aggiornato dai campi.", "ok");
+    } catch (e) {
+      setStatus(statusWp1, `JSON non valido: ${e.message}`, "err");
+    }
+  });
+
+  wp1Send.addEventListener("click", async () => {
+    logWp1.classList.add("hidden");
+    logWp1.textContent = "";
+
+    const authLocal = await getVt1LocalForAuth();
+    const authBuilt = buildVt1AuthorizationHeader(authLocal);
+    if (!authBuilt.ok) {
+      setStatus(statusWp1, authBuilt.message, "err");
+      return;
+    }
+
+    let bodyObj;
+    try {
+      bodyObj = JSON.parse(wp1Json.value);
+    } catch (e) {
+      setStatus(statusWp1, `JSON non valido: ${e.message}`, "err");
+      return;
+    }
+
+    applyWp1FieldsToPayload(bodyObj, collectWp1FormValues());
+    applyVenditoreToPayload(bodyObj, wp1VenditoreCache);
+    const bodyStr = JSON.stringify(bodyObj);
+    wp1Json.value = JSON.stringify(bodyObj, null, 2);
+
+    wp1Send.disabled = true;
+    setStatus(statusWp1, "Invio in corso…", "");
+
+    try {
+      const endpoint = await getVt1Url();
+      const headers = {
+        "Content-Type": "application/json",
+        Authorization: authBuilt.value,
+      };
+      const cookie = wp1Cookie.value.trim();
+      if (cookie) headers.Cookie = cookie;
+
+      const res = await fetch(endpoint, {
+        method: "POST",
+        headers,
+        body: bodyStr,
+      });
+
+      const text = await res.text();
+      let pretty = text;
+      try {
+        pretty = JSON.stringify(JSON.parse(text), null, 2);
+      } catch {
+        /* testo puro */
+      }
+
+      if (!res.ok) {
+        setStatus(statusWp1, `HTTP ${res.status}`, "err");
+        logWp1.textContent = pretty;
+        logWp1.classList.remove("hidden");
+        return;
+      }
+
+      setStatus(statusWp1, `OK · HTTP ${res.status}`, "ok");
+      if (pretty) {
+        logWp1.textContent = pretty;
+        logWp1.classList.remove("hidden");
+      }
+
+      await chrome.storage.local.set({ vt1Cookie: cookie });
+    } catch (e) {
+      setStatus(statusWp1, String(e.message || e), "err");
+    } finally {
+      wp1Send.disabled = false;
     }
   });
 });

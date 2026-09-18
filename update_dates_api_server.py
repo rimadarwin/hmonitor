@@ -33,6 +33,8 @@ def _serialize_result(result: UpdateResult):
                 "campo": c.campo,
                 "vecchio": c.vecchio,
                 "nuovo": c.nuovo,
+                "skipped": bool(c.skipped),
+                "note": c.note,
             }
             for c in result.changes
         ],

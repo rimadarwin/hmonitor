@@ -6,7 +6,7 @@ import json
 from datetime import datetime
 from copy import deepcopy
 from dataclasses import dataclass, field
-from typing import Any, List, Optional
+from typing import Any, List, Optional, Tuple
 
 load_dotenv()
 
@@ -17,6 +17,9 @@ class ChangeLogEntry:
     campo: str
     vecchio: Any
     nuovo: Any
+    # True = campo/riga non trovato: nessuna modifica applicata, flusso prosegue
+    skipped: bool = False
+    note: Optional[str] = None
 
 
 @dataclass
@@ -31,8 +34,8 @@ def get_today_formats():
     """Restituisce la data odierna nei formati richiesti."""
     today = datetime.now()
     return {
-        'compact': today.strftime('%Y%m%d'),  # 20260326
-        'datetime': today.strftime('%Y-%m-%d 00:00:00.000')  # 2026-03-26 00:00:00.000
+        "compact": today.strftime("%Y%m%d"),  # 20260326
+        "datetime": today.strftime("%Y-%m-%d 00:00:00.000"),  # 2026-03-26 00:00:00.000
     }
 
 
@@ -51,29 +54,25 @@ def update_json_key_value(json_data, key_name, key_field, value_field, new_value
     Aggiorna il valore di una chiave specifica in un oggetto JSON.
     Gestisce sia oggetti Python (dict/list) che stringhe JSON.
     Supporta strutture annidate come {"Request":{"Fields":[...]}}
-    
-    Args:
-        json_data: L'oggetto JSON (dict, list) o stringa JSON
-        key_name: Il nome della chiave da cercare (es. "DT_DECRICHIESTA")
-        key_field: Il nome del campo che contiene il nome della chiave (es. "Key" o "field")
-        value_field: Il nome del campo che contiene il valore (es. "Value" o "value")
-        new_value: Il nuovo valore da impostare
-    
+
     Returns:
-        tuple: (oggetto_modificato, valore_vecchio) o (None, None) se non trovato
+        tuple: (oggetto_modificato, valore_vecchio, found)
+        Se non trovato: (json_data originale / copia non usata, None, False)
     """
     is_string = isinstance(json_data, str)
-    
+
     if is_string:
         data = json.loads(json_data)
     else:
         data = deepcopy(json_data)
-    
+
     old_value = None
     found = False
-    
+
     if isinstance(data, list):
-        found, old_value = find_and_update_in_list(data, key_name, key_field, value_field, new_value)
+        found, old_value = find_and_update_in_list(
+            data, key_name, key_field, value_field, new_value
+        )
     elif isinstance(data, dict):
         if data.get(key_field) == key_name:
             old_value = data.get(value_field)
@@ -91,26 +90,109 @@ def update_json_key_value(json_data, key_name, key_field, value_field, new_value
             found, old_value = find_and_update_in_list(
                 data["datiAnagrafici"], key_name, key_field, value_field, new_value
             )
-    
+
     if not found:
-        return None, None
-    
+        return json_data, None, False
+
     if is_string:
-        return json.dumps(data, ensure_ascii=False), old_value
-    else:
-        return data, old_value
+        return json.dumps(data, ensure_ascii=False), old_value, True
+    return data, old_value, True
+
+
+def _log_skip(
+    changes_log: List[ChangeLogEntry],
+    tabella: str,
+    campo: str,
+    note: str,
+) -> None:
+    # Debug: campo saltato, il flusso continua
+    print(f"[SKIP] {tabella}.{campo}: {note}")
+    changes_log.append(
+        ChangeLogEntry(
+            tabella=tabella,
+            campo=campo,
+            vecchio="(non trovato)",
+            nuovo="(non aggiornato)",
+            skipped=True,
+            note=note,
+        )
+    )
+
+
+def _log_change(
+    changes_log: List[ChangeLogEntry],
+    tabella: str,
+    campo: str,
+    vecchio: Any,
+    nuovo: Any,
+) -> None:
+    print(f"[OK] {tabella}.{campo}: {vecchio} -> {nuovo}")
+    changes_log.append(
+        ChangeLogEntry(
+            tabella=tabella,
+            campo=campo,
+            vecchio=vecchio,
+            nuovo=nuovo,
+            skipped=False,
+        )
+    )
+
+
+def _as_json_param(value: Any):
+    return Json(value) if isinstance(value, (dict, list)) else value
+
+
+def _update_dati_sap_campo(
+    cursor,
+    code: str,
+    nome_campo: str,
+    new_value: str,
+    changes_log: List[ChangeLogEntry],
+) -> None:
+    """Aggiorna un nome_campo in amc.dati_sap_per_richiesta; se assente, logga e prosegue."""
+    cursor.execute(
+        "SELECT valore FROM amc.dati_sap_per_richiesta "
+        "WHERE numero_richiesta = %s AND nome_campo = %s",
+        (code, nome_campo),
+    )
+    row = cursor.fetchone()
+    if not row:
+        _log_skip(
+            changes_log,
+            "amc.dati_sap_per_richiesta",
+            f"valore ({nome_campo})",
+            f"Nessuna riga per numero_richiesta='{code}' e nome_campo='{nome_campo}'",
+        )
+        return
+
+    valore_old = row[0]
+    cursor.execute(
+        "UPDATE amc.dati_sap_per_richiesta SET valore = %s "
+        "WHERE numero_richiesta = %s AND nome_campo = %s",
+        (new_value, code, nome_campo),
+    )
+    _log_change(
+        changes_log,
+        "amc.dati_sap_per_richiesta",
+        f"valore ({nome_campo})",
+        valore_old,
+        new_value,
+    )
 
 
 def run_update_request_dates(request_code: str) -> UpdateResult:
     """
     Esegue gli aggiornamenti sul database per il codice richiesta indicato.
     Usabile da CLI e da API locale (estensione Chrome).
+
+    Se un singolo campo JSON/riga dati_sap non è presente, non interrompe:
+    registra lo skip nel log e prosegue con gli altri aggiornamenti.
     """
     code = (request_code or "").strip()
     if not code:
         return UpdateResult(ok=False, request_code="", error="Codice richiesta non inserito.")
 
-    database_url = os.environ.get('DATABASE_URL')
+    database_url = os.environ.get("DATABASE_URL")
     if not database_url:
         return UpdateResult(
             ok=False,
@@ -123,9 +205,10 @@ def run_update_request_dates(request_code: str) -> UpdateResult:
     conn = None
 
     try:
-        conn = psycopg2.connect(database_url, sslmode='require')
+        conn = psycopg2.connect(database_url, sslmode="require")
         cursor = conn.cursor()
 
+        # --- amc.request ---
         cursor.execute(
             "SELECT input, data_decorrenza FROM amc.request WHERE request_code = %s",
             (code,),
@@ -142,40 +225,44 @@ def run_update_request_dates(request_code: str) -> UpdateResult:
         input_json, data_decorrenza_old = row
         data_decorrenza_old_str = str(data_decorrenza_old) if data_decorrenza_old else "NULL"
 
-        new_input_json, dt_decrichiesta_old = update_json_key_value(
-            input_json, "DT_DECRICHIESTA", "Key", "Value", dates['compact']
+        new_input_json, dt_decrichiesta_old, found_dt = update_json_key_value(
+            input_json, "DT_DECRICHIESTA", "Key", "Value", dates["compact"]
         )
 
-        if new_input_json is None:
-            return UpdateResult(
-                ok=False,
-                request_code=code,
-                error="Chiave DT_DECRICHIESTA non trovata nel campo input",
+        if found_dt:
+            cursor.execute(
+                "UPDATE amc.request SET input = %s, data_decorrenza = %s WHERE request_code = %s",
+                (_as_json_param(new_input_json), dates["datetime"], code),
+            )
+            _log_change(
+                changes_log,
+                "amc.request",
+                "input (DT_DECRICHIESTA)",
+                dt_decrichiesta_old,
+                dates["compact"],
+            )
+        else:
+            # Aggiorna comunque data_decorrenza colonna; JSON input invariato
+            cursor.execute(
+                "UPDATE amc.request SET data_decorrenza = %s WHERE request_code = %s",
+                (dates["datetime"], code),
+            )
+            _log_skip(
+                changes_log,
+                "amc.request",
+                "input (DT_DECRICHIESTA)",
+                "Chiave DT_DECRICHIESTA non trovata nel campo input",
             )
 
-        update_value = Json(new_input_json) if isinstance(new_input_json, (dict, list)) else new_input_json
-        cursor.execute(
-            "UPDATE amc.request SET input = %s, data_decorrenza = %s WHERE request_code = %s",
-            (update_value, dates['datetime'], code),
+        _log_change(
+            changes_log,
+            "amc.request",
+            "data_decorrenza",
+            data_decorrenza_old_str,
+            dates["datetime"],
         )
 
-        changes_log.append(
-            ChangeLogEntry(
-                tabella='amc.request',
-                campo='input (DT_DECRICHIESTA)',
-                vecchio=dt_decrichiesta_old,
-                nuovo=dates['compact'],
-            )
-        )
-        changes_log.append(
-            ChangeLogEntry(
-                tabella='amc.request',
-                campo='data_decorrenza',
-                vecchio=data_decorrenza_old_str,
-                nuovo=dates['datetime'],
-            )
-        )
-
+        # --- amc.sap_messages: DATA_DECORRENZA + DATA_ESECUZIONE ---
         cursor.execute(
             "SELECT json_message FROM amc.sap_messages WHERE request_code = %s",
             (code,),
@@ -183,74 +270,75 @@ def run_update_request_dates(request_code: str) -> UpdateResult:
         row = cursor.fetchone()
 
         if not row:
-            conn.rollback()
-            return UpdateResult(
-                ok=False,
-                request_code=code,
-                error=f"Nessuna riga trovata in amc.sap_messages per request_code = '{code}'",
+            _log_skip(
+                changes_log,
+                "amc.sap_messages",
+                "json_message (DATA_DECORRENZA)",
+                f"Nessuna riga per request_code='{code}'",
             )
-
-        json_message = row[0]
-
-        new_json_message, data_decorrenza_sap_old = update_json_key_value(
-            json_message, "DATA_DECORRENZA", "field", "value", dates['compact']
-        )
-
-        if new_json_message is None:
-            conn.rollback()
-            return UpdateResult(
-                ok=False,
-                request_code=code,
-                error="Chiave DATA_DECORRENZA non trovata nel campo json_message",
+            _log_skip(
+                changes_log,
+                "amc.sap_messages",
+                "json_message (DATA_ESECUZIONE)",
+                f"Nessuna riga per request_code='{code}'",
             )
+        else:
+            json_message = row[0]
+            current_msg = json_message
+            any_sap_field_updated = False
 
-        update_msg_value = (
-            Json(new_json_message)
-            if isinstance(new_json_message, (dict, list))
-            else new_json_message
-        )
-        cursor.execute(
-            "UPDATE amc.sap_messages SET json_message = %s WHERE request_code = %s",
-            (update_msg_value, code),
-        )
-
-        changes_log.append(
-            ChangeLogEntry(
-                tabella='amc.sap_messages',
-                campo='json_message (DATA_DECORRENZA)',
-                vecchio=data_decorrenza_sap_old,
-                nuovo=dates['compact'],
+            current_msg, decor_old, found_decor = update_json_key_value(
+                current_msg, "DATA_DECORRENZA", "field", "value", dates["compact"]
             )
-        )
+            if found_decor:
+                any_sap_field_updated = True
+                _log_change(
+                    changes_log,
+                    "amc.sap_messages",
+                    "json_message (DATA_DECORRENZA)",
+                    decor_old,
+                    dates["compact"],
+                )
+            else:
+                _log_skip(
+                    changes_log,
+                    "amc.sap_messages",
+                    "json_message (DATA_DECORRENZA)",
+                    "Chiave DATA_DECORRENZA non trovata in json_message",
+                )
 
-        cursor.execute(
-            "SELECT valore FROM amc.dati_sap_per_richiesta WHERE numero_richiesta = %s AND nome_campo = 'DATA_DECORRENZA'",
-            (code,),
-        )
-        row = cursor.fetchone()
-
-        if not row:
-            conn.rollback()
-            return UpdateResult(
-                ok=False,
-                request_code=code,
-                error=f"Nessuna riga trovata in amc.dati_sap_per_richiesta per numero_richiesta = '{code}'",
+            current_msg, esec_old, found_esec = update_json_key_value(
+                current_msg, "DATA_ESECUZIONE", "field", "value", dates["compact"]
             )
+            if found_esec:
+                any_sap_field_updated = True
+                _log_change(
+                    changes_log,
+                    "amc.sap_messages",
+                    "json_message (DATA_ESECUZIONE)",
+                    esec_old,
+                    dates["compact"],
+                )
+            else:
+                _log_skip(
+                    changes_log,
+                    "amc.sap_messages",
+                    "json_message (DATA_ESECUZIONE)",
+                    "Chiave DATA_ESECUZIONE non trovata in json_message",
+                )
 
-        valore_old = row[0]
+            if any_sap_field_updated:
+                cursor.execute(
+                    "UPDATE amc.sap_messages SET json_message = %s WHERE request_code = %s",
+                    (_as_json_param(current_msg), code),
+                )
 
-        cursor.execute(
-            "UPDATE amc.dati_sap_per_richiesta SET valore = %s WHERE numero_richiesta = %s AND nome_campo = 'DATA_DECORRENZA'",
-            (dates['compact'], code),
+        # --- amc.dati_sap_per_richiesta: DATA_DECORRENZA + DATA_ESECUZIONE ---
+        _update_dati_sap_campo(
+            cursor, code, "DATA_DECORRENZA", dates["compact"], changes_log
         )
-
-        changes_log.append(
-            ChangeLogEntry(
-                tabella='amc.dati_sap_per_richiesta',
-                campo='valore',
-                vecchio=valore_old,
-                nuovo=dates['compact'],
-            )
+        _update_dati_sap_campo(
+            cursor, code, "DATA_ESECUZIONE", dates["compact"], changes_log
         )
 
         conn.commit()
@@ -297,17 +385,20 @@ def main():
         return
 
     print("\n" + "=" * 60)
-    print("OPERAZIONE COMPLETATA CON SUCCESSO")
+    print("OPERAZIONE COMPLETATA")
     print("=" * 60)
     print(f"\nRichiesta: {result.request_code}")
-    print("\nRiepilogo modifiche:")
+    print("\nRiepilogo modifiche / skip:")
     print("-" * 60)
 
     for change in result.changes:
-        print(f"\nTabella: {change.tabella}")
+        stato = "SALTATO" if change.skipped else "AGGIORNATO"
+        print(f"\n[{stato}] Tabella: {change.tabella}")
         print(f"  Campo:   {change.campo}")
         print(f"  Vecchio: {change.vecchio}")
         print(f"  Nuovo:   {change.nuovo}")
+        if change.note:
+            print(f"  Nota:    {change.note}")
 
     print("\n" + "=" * 60)
     print("\nConnessione al database chiusa.")
