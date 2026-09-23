@@ -2,6 +2,7 @@
 """
 @author Maurizio di Sabato <maurizio.disabato@xcconsulting.it>
 @description Riporta in sospeso una richiesta su amc.sap_messages
+@modified 23.09.2026 - MDS | Se più righe per request_code, aggiorna solo l'ultimo record
 @modified 23.09.2026 - MDS | UPDATE message_state=SOSPESO, attiva_sap='' per request_code
 
 Usabile da CLI e da API (estensione Chrome).
@@ -23,7 +24,8 @@ _TABLE = "amc.sap_messages"
 def run_riporta_in_sospeso(request_code: str) -> UpdateResult:
     """
     Imposta message_state = 'SOSPESO' e attiva_sap = '' su amc.sap_messages
-    per le righe con request_code indicato.
+    per il request_code indicato. Se esistono più righe, aggiorna solo
+    l'ultima (create_timestamp DESC, poi id_sap_messages DESC).
     """
     code = (request_code or "").strip()
     if not code:
@@ -44,66 +46,68 @@ def run_riporta_in_sospeso(request_code: str) -> UpdateResult:
         conn = psycopg2.connect(database_url, sslmode="require")
         cursor = conn.cursor()
 
+        # Ultimo record per request_code (timestamp di creazione, poi id)
         cursor.execute(
-            f"SELECT message_state, attiva_sap FROM {_TABLE} WHERE request_code = %s",
+            f"""
+            SELECT id_sap_messages, message_state, attiva_sap, create_timestamp
+            FROM {_TABLE}
+            WHERE request_code = %s
+            ORDER BY create_timestamp DESC NULLS LAST, id_sap_messages DESC
+            LIMIT 1
+            """,
             (code,),
         )
-        rows = cursor.fetchall()
-        if not rows:
+        row = cursor.fetchone()
+        if not row:
             return UpdateResult(
                 ok=False,
                 request_code=code,
                 error=f"Nessuna riga trovata in {_TABLE} per request_code = '{code}'",
             )
 
-        changes = []
-        for message_state, attiva_sap in rows:
-            old_state = "" if message_state is None else str(message_state)
-            old_attiva = "" if attiva_sap is None else str(attiva_sap)
-            changes.append(
-                ChangeLogEntry(
-                    tabella=_TABLE,
-                    campo="message_state",
-                    vecchio=old_state or "(vuoto)",
-                    nuovo="SOSPESO",
-                    skipped=False,
-                )
-            )
-            changes.append(
-                ChangeLogEntry(
-                    tabella=_TABLE,
-                    campo="attiva_sap",
-                    vecchio=old_attiva or "(vuoto)",
-                    nuovo="(vuoto)",
-                    skipped=False,
-                )
-            )
+        id_row, message_state, attiva_sap, create_ts = row
+        old_state = "" if message_state is None else str(message_state)
+        old_attiva = "" if attiva_sap is None else str(attiva_sap)
 
         cursor.execute(
-            f"UPDATE {_TABLE} "
-            f"SET message_state = %s, attiva_sap = %s "
-            f"WHERE request_code = %s",
-            ("SOSPESO", "", code),
+            f"""
+            UPDATE {_TABLE}
+            SET message_state = %s, attiva_sap = %s
+            WHERE id_sap_messages = %s
+            """,
+            ("SOSPESO", "", id_row),
         )
-        updated = cursor.rowcount
         conn.commit()
 
         print(
-            f"[OK] {_TABLE}: {updated} riga/e → message_state=SOSPESO, attiva_sap='' "
-            f"(request_code={code})"
+            f"[OK] {_TABLE} id={id_row}: message_state=SOSPESO, attiva_sap='' "
+            f"(request_code={code}, create_timestamp={create_ts})"
         )
-        if updated > 1:
-            changes.append(
-                ChangeLogEntry(
-                    tabella=_TABLE,
-                    campo="(riepilogo)",
-                    vecchio="—",
-                    nuovo=f"{updated} righe aggiornate",
-                    skipped=False,
-                    note="Più di una riga con lo stesso request_code",
-                )
-            )
 
+        changes = [
+            ChangeLogEntry(
+                tabella=_TABLE,
+                campo="id_sap_messages",
+                vecchio="—",
+                nuovo=str(id_row),
+                skipped=False,
+                note="Solo ultimo record per request_code",
+            ),
+            ChangeLogEntry(
+                tabella=_TABLE,
+                campo="message_state",
+                vecchio=old_state or "(vuoto)",
+                nuovo="SOSPESO",
+                skipped=False,
+            ),
+            ChangeLogEntry(
+                tabella=_TABLE,
+                campo="attiva_sap",
+                vecchio=old_attiva or "(vuoto)",
+                nuovo="(vuoto)",
+                skipped=False,
+            ),
+        ]
         return UpdateResult(ok=True, request_code=code, changes=changes)
 
     except psycopg2.Error as e:

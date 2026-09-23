@@ -96,6 +96,7 @@ Risposta con log `changes` (prima/dopo), stesso formato di `/update`.
 ### `POST /riporta-sospeso`
 
 Su `amc.sap_messages` per il `request_code`: `message_state = 'SOSPESO'`, `attiva_sap = ''`.
+Se esistono più righe con lo stesso codice, aggiorna solo l’ultima (`create_timestamp` / `id_sap_messages`).
 
 ```json
 { "request_code": "V00000030814" }
