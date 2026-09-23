@@ -2,7 +2,7 @@
 <html lang="it">
 <head>
   <meta charset="UTF-8" />
-  <title>Impostazioni — Hera richieste</title>
+  <title>Impostazioni — Hera avanzamento pratiche</title>
   <style>
     body {
       font-family: system-ui, Segoe UI, sans-serif;
@@ -60,13 +60,18 @@
 
   <hr />
 
-  <h2>VT1 · inbound DLSII</h2>
+  <h2>API Heroku (flussi DLSII / managecomunication)</h2>
   <p class="hint">
-    URL completo dell’endpoint POST. Se cambi dominio Heroku, aggiungi il pattern in
-    <code>manifest.json</code> sotto <code>host_permissions</code> e ricarica l’estensione.
+    Solo la base URL (senza path). I flussi aggiungono automaticamente
+    <code>/dlsii/inboundflow</code>, <code>/managecomunication/send-esiti</code>
+    oppure <code>/batch/invoke</code>.
   </p>
-  <label for="vt1InboundUrl">URL inboundflow</label>
-  <input type="url" id="vt1InboundUrl" placeholder="https://….herokuapp.com/dlsii/inboundflow" />
+  <label for="herokuBaseUrl">Base URL Heroku</label>
+  <input
+    type="url"
+    id="herokuBaseUrl"
+    placeholder="https://gh-manage-co-dev-int-….herokuapp.com"
+  />
 
   <p class="hint">Authorization e Cookie restano sul dispositivo (storage locale), non in sync.</p>
   <label for="vt1AuthScheme">Tipo Authorization</label>

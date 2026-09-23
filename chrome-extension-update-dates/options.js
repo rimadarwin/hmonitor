@@ -1,6 +1,19 @@
 const DEFAULT_API = "https://hmonitor-uhk9.onrender.com";
-const DEFAULT_VT1_URL =
+/** Base Heroku senza path: i flussi aggiungono /dlsii/inboundflow o /managecomunication/send-esiti */
+const DEFAULT_HEROKU_BASE =
+  "https://gh-manage-co-dev-int-a0c1c0ddf5f3.herokuapp.com";
+const LEGACY_VT1_URL =
   "https://gh-manage-co-dev-int-a0c1c0ddf5f3.herokuapp.com/dlsii/inboundflow";
+
+function normalizeHerokuBase(raw) {
+  let u = (raw || "").trim().replace(/\/+$/, "");
+  if (!u) return DEFAULT_HEROKU_BASE;
+  // Migrazione da URL completo legacy (…/dlsii/inboundflow)
+  u = u.replace(/\/dlsii\/inboundflow\/?$/i, "");
+  u = u.replace(/\/managecomunication\/send-esiti\/?$/i, "");
+  u = u.replace(/\/batch\/invoke\/?$/i, "");
+  return u.replace(/\/+$/, "") || DEFAULT_HEROKU_BASE;
+}
 
 function toggleAuthBlocks(scheme) {
   const bearer = document.getElementById("vt1BearerBlock");
@@ -36,7 +49,7 @@ function migrateLegacyAuthorization(local) {
 
 document.addEventListener("DOMContentLoaded", async () => {
   const apiBaseUrl = document.getElementById("apiBaseUrl");
-  const vt1InboundUrl = document.getElementById("vt1InboundUrl");
+  const herokuBaseUrl = document.getElementById("herokuBaseUrl");
   const vt1AuthScheme = document.getElementById("vt1AuthScheme");
   const vt1BearerToken = document.getElementById("vt1BearerToken");
   const vt1BasicUser = document.getElementById("vt1BasicUser");
@@ -47,10 +60,15 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   const syncVals = await chrome.storage.sync.get({
     apiBaseUrl: DEFAULT_API,
-    vt1InboundUrl: DEFAULT_VT1_URL,
+    herokuBaseUrl: "",
+    vt1InboundUrl: "",
   });
   apiBaseUrl.value = (syncVals.apiBaseUrl || DEFAULT_API).replace(/\/+$/, "");
-  vt1InboundUrl.value = (syncVals.vt1InboundUrl || DEFAULT_VT1_URL).trim();
+
+  const migratedBase = normalizeHerokuBase(
+    syncVals.herokuBaseUrl || syncVals.vt1InboundUrl || DEFAULT_HEROKU_BASE
+  );
+  herokuBaseUrl.value = migratedBase;
 
   const localVals = await chrome.storage.local.get({
     vt1AuthScheme: "bearer",
@@ -85,12 +103,16 @@ document.addEventListener("DOMContentLoaded", async () => {
   save.addEventListener("click", async () => {
     let api = apiBaseUrl.value.trim() || DEFAULT_API;
     api = api.replace(/\/+$/, "");
-    let vt1 = vt1InboundUrl.value.trim() || DEFAULT_VT1_URL;
+    const heroku = normalizeHerokuBase(
+      herokuBaseUrl.value.trim() || DEFAULT_HEROKU_BASE
+    );
 
     await chrome.storage.sync.set({
       apiBaseUrl: api,
-      vt1InboundUrl: vt1,
+      herokuBaseUrl: heroku,
     });
+    // Pulisce la chiave legacy se presente
+    await chrome.storage.sync.remove(["vt1InboundUrl"]);
 
     const scheme = vt1AuthScheme.value === "basic" ? "basic" : "bearer";
     await chrome.storage.local.set({

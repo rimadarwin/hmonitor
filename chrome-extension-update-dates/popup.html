@@ -1,9 +1,15 @@
 <!DOCTYPE html>
 <html lang="it">
+<!--
+  @author Maurizio di Sabato <maurizio.disabato@xcconsulting.it>
+  @description Side panel estensione Hera - avanzamento pratiche
+  @modified 23.09.2026 - MDS | Pulsante blu Riporta in sospeso (amc.sap_messages)
+  @modified 23.09.2026 - MDS | Riquadri JSON amc.request (id_request + input) per ogni flusso
+-->
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Operazioni richiesta</title>
+  <title>Hera - avanzamento pratiche</title>
   <link rel="stylesheet" href="popup.css" />
 </head>
 <body class="is-side-panel">
@@ -11,11 +17,19 @@
     <!-- Home: scelta azione -->
     <section id="screenHome">
       <h1>Operazioni</h1>
-      <p class="hint">Scegli l’azione. Per VT1 / WP1 apri il dettaglio richiesta nel tab attivo prima di cliccare.</p>
       <button type="button" id="goDates" class="choice primary">Aggiorna data</button>
       <button type="button" id="goCanale" class="choice primary">Switch ATOA/FILE</button>
-      <button type="button" id="goVt1" class="choice accent">VT1 ELE 150</button>
-      <button type="button" id="goWp1" class="choice accent">WP1 ELE 150</button>
+      <button type="button" id="goSospeso" class="choice primary">Riporta in sospeso</button>
+      <button type="button" id="goBatchApn" class="choice accent">APN BATCH MS_083</button>
+      <button type="button" id="goEleAv1" class="choice accent">ELE AV1 150</button>
+      <button type="button" id="goSe1Dtec" class="choice accent">ELE SE1 DTEC</button>
+      <button type="button" id="goVt1" class="choice accent">ELE VT1 150</button>
+      <button type="button" id="goWp1" class="choice accent">ELE WP1 150</button>
+      <button type="button" id="goGasA01" class="choice accent">GAS A01 100</button>
+      <button type="button" id="goGasA01150" class="choice accent">GAS A01 150</button>
+      <button type="button" id="goGasA01Dtec" class="choice accent">GAS A01 DTEC</button>
+      <button type="button" id="goSg1" class="choice accent">GAS SG1 300</button>
+      <button type="button" id="goSg1Dtms" class="choice accent">GAS SG1 DTMS</button>
       <p class="footer">
         <a href="#" id="openOptionsHome">Impostazioni</a>
       </p>
@@ -45,6 +59,7 @@
       <h1>Switch ATOA / FILE</h1>
       <p class="hint">
         Inverte <code>canale_com</code> su <code>amc.request</code>: ATOA → FILE oppure FILE → ATOA.
+        Usalo a mano prima/dopo SG1 DTMS se serve cambiare canale.
       </p>
       <label class="field">
         <span>Codice richiesta</span>
@@ -59,9 +74,99 @@
       </p>
     </section>
 
+    <!-- Riporta in sospeso su amc.sap_messages -->
+    <section id="screenSospeso" class="hidden">
+      <h1>Riporta in sospeso</h1>
+      <p class="hint">
+        Su <code>amc.sap_messages</code> per il codice richiesta:
+        <code>message_state = 'SOSPESO'</code> e <code>attiva_sap = ''</code>.
+      </p>
+      <label class="field">
+        <span>Codice richiesta</span>
+        <input type="text" id="requestCodeSospeso" placeholder="es. V00000030814" autocomplete="off" spellcheck="false" />
+      </label>
+      <button type="button" id="runSospesoBtn" class="primary">Riporta in sospeso</button>
+      <div id="statusSospeso" class="status" aria-live="polite"></div>
+      <pre id="logSospeso" class="log hidden"></pre>
+      <button type="button" id="backFromSospeso" class="linkish">← Indietro</button>
+      <p class="footer tight">
+        <a href="#" id="openOptionsSospeso">Impostazioni API locale</a>
+      </p>
+    </section>
+
+    <!-- ELE AV1 150 → /dlsii/inboundflow -->
+    <section id="screenEleAv1" class="hidden">
+      <h1>ELE AV1 150</h1>
+      <p class="hint">
+        Endpoint <code>/dlsii/inboundflow</code>. DOCUMENTKEY / POD / RIF_EXT dal dettaglio;
+        <code>EXT_DT_DECOR_D</code> = oggi (DD/MM/YYYY).
+      </p>
+      <button type="button" id="scrapeAgainEleAv1" class="secondary full">Refresh dati</button>
+      <label class="field">
+        <span>DOCUMENTKEY</span>
+        <input type="text" id="eleAv1Documentkey" autocomplete="off" spellcheck="false" />
+      </label>
+      <label class="field">
+        <span>RIF_EXT</span>
+        <input type="text" id="eleAv1RifExt" autocomplete="off" spellcheck="false" />
+      </label>
+      <label class="field">
+        <span>POD</span>
+        <input type="text" id="eleAv1Pod" autocomplete="off" spellcheck="false" />
+      </label>
+      <label class="field">
+        <span>EXT_DT_DECOR_D (DD/MM/YYYY)</span>
+        <input type="text" id="eleAv1ExtDtDecor" autocomplete="off" spellcheck="false" />
+      </label>
+      <label class="field">
+        <span>EXT_STATO_RICHIESTA (fisso)</span>
+        <input type="text" id="eleAv1ExtStato" autocomplete="off" spellcheck="false" readonly tabindex="-1" value="1" />
+      </label>
+      <label class="field">
+        <span>EXT_POT_IMP</span>
+        <input type="text" id="eleAv1PotImp" autocomplete="off" spellcheck="false" />
+      </label>
+      <label class="field">
+        <span>EXT_POT_DISP</span>
+        <input type="text" id="eleAv1PotDisp" autocomplete="off" spellcheck="false" />
+      </label>
+      <label class="field">
+        <span>EXT_OPZ_TARIFFA</span>
+        <input type="text" id="eleAv1OpzTariffa" autocomplete="off" spellcheck="false" />
+      </label>
+      <label class="field">
+        <span>EXT_TENS_FASE</span>
+        <input type="text" id="eleAv1TensFase" autocomplete="off" spellcheck="false" />
+      </label>
+      <p class="hint vt1-auth-hint">
+        <strong>Authorization</strong> e cookie: stesse impostazioni VT1 in
+        <a href="#" id="openOptionsEleAv1Auth">Impostazioni</a>.
+      </p>
+      <label class="field">
+        <span>Cookie (opzionale, es. JSESSIONID=…)</span>
+        <input type="text" id="eleAv1Cookie" autocomplete="off" spellcheck="false" />
+      </label>
+      <label class="field">
+        <span>Dati da amc.request (id_request + input)</span>
+        <textarea id="eleAv1DbJson" rows="8" spellcheck="false" readonly></textarea>
+      </label>
+      <label class="field">
+        <span>Corpo JSON</span>
+        <textarea id="eleAv1Json" rows="10" spellcheck="false"></textarea>
+      </label>
+      <button type="button" id="eleAv1ApplyFields" class="secondary full">Aggiorna JSON dai campi sopra</button>
+      <button type="button" id="eleAv1Send" class="primary">Invia richiesta</button>
+      <div id="statusEleAv1" class="status" aria-live="polite"></div>
+      <pre id="logEleAv1" class="log hidden"></pre>
+      <button type="button" id="backFromEleAv1" class="linkish">← Indietro</button>
+      <p class="footer tight">
+        <a href="#" id="openOptionsEleAv1">Impostazioni</a>
+      </p>
+    </section>
+
     <!-- VT1 inbound -->
     <section id="screenVt1" class="hidden">
-      <h1>VT1 · flusso 0150</h1>
+      <h1>ELE VT1 150</h1>
       <p class="hint">Campi letti dal tab corrente (dettaglio richiesta). Controlla e invia.</p>
       <button type="button" id="scrapeAgain" class="secondary full">Refresh dati</button>
       <label class="field">
@@ -106,6 +211,10 @@
         <input type="text" id="vt1Cookie" autocomplete="off" spellcheck="false" />
       </label>
       <label class="field">
+        <span>Dati da amc.request (id_request + input)</span>
+        <textarea id="vt1DbJson" rows="8" spellcheck="false" readonly></textarea>
+      </label>
+      <label class="field">
         <span>Corpo JSON</span>
         <textarea id="vt1Json" rows="10" spellcheck="false"></textarea>
       </label>
@@ -121,7 +230,7 @@
 
     <!-- WP1 (VP1) inbound flusso 0150 — elettrico -->
     <section id="screenWp1" class="hidden">
-      <h1>WP1 · flusso 0150 (VP1)</h1>
+      <h1>ELE WP1 150</h1>
       <p class="hint">Stesso endpoint VT1. Campi elettrici e anagrafica base letti dal dettaglio richiesta.</p>
       <button type="button" id="scrapeAgainWp1" class="secondary full">Refresh dati</button>
       <label class="field">
@@ -178,6 +287,10 @@
         <input type="text" id="wp1Cookie" autocomplete="off" spellcheck="false" />
       </label>
       <label class="field">
+        <span>Dati da amc.request (id_request + input)</span>
+        <textarea id="wp1DbJson" rows="8" spellcheck="false" readonly></textarea>
+      </label>
+      <label class="field">
         <span>Corpo JSON</span>
         <textarea id="wp1Json" rows="10" spellcheck="false"></textarea>
       </label>
@@ -190,8 +303,444 @@
         <a href="#" id="openOptionsWp1">Impostazioni</a>
       </p>
     </section>
+
+    <!-- GAS A01 100 → /dlsii/inboundflow -->
+    <section id="screenGasA01" class="hidden">
+      <h1>GAS A01 100</h1>
+      <p class="hint">Endpoint <code>/dlsii/inboundflow</code>. DOCUMENTKEY / COD_PDR / RIF_EXT dal dettaglio richiesta.</p>
+      <button type="button" id="scrapeAgainGasA01" class="secondary full">Refresh dati</button>
+      <label class="field">
+        <span>DOCUMENTKEY</span>
+        <input type="text" id="gasA01Documentkey" autocomplete="off" spellcheck="false" />
+      </label>
+      <label class="field">
+        <span>RIF_EXT</span>
+        <input type="text" id="gasA01RifExt" autocomplete="off" spellcheck="false" />
+      </label>
+      <label class="field">
+        <span>COD_PDR</span>
+        <input type="text" id="gasA01CodPdr" autocomplete="off" spellcheck="false" />
+      </label>
+      <p class="hint vt1-auth-hint">
+        <strong>Authorization</strong> e cookie: stesse impostazioni VT1 in
+        <a href="#" id="openOptionsGasA01Auth">Impostazioni</a>.
+      </p>
+      <label class="field">
+        <span>Cookie (opzionale, es. JSESSIONID=…)</span>
+        <input type="text" id="gasA01Cookie" autocomplete="off" spellcheck="false" />
+      </label>
+      <label class="field">
+        <span>Dati da amc.request (id_request + input)</span>
+        <textarea id="gasA01DbJson" rows="8" spellcheck="false" readonly></textarea>
+      </label>
+      <label class="field">
+        <span>Corpo JSON</span>
+        <textarea id="gasA01Json" rows="10" spellcheck="false"></textarea>
+      </label>
+      <button type="button" id="gasA01ApplyFields" class="secondary full">Aggiorna JSON dai campi sopra</button>
+      <button type="button" id="gasA01Send" class="primary">Invia richiesta</button>
+      <div id="statusGasA01" class="status" aria-live="polite"></div>
+      <pre id="logGasA01" class="log hidden"></pre>
+      <button type="button" id="backFromGasA01" class="linkish">← Indietro</button>
+      <p class="footer tight">
+        <a href="#" id="openOptionsGasA01">Impostazioni</a>
+      </p>
+    </section>
+
+    <!-- GAS A01 150 → /dlsii/inboundflow -->
+    <section id="screenGasA01150" class="hidden">
+      <h1>GAS A01 150</h1>
+      <p class="hint">
+        Endpoint <code>/dlsii/inboundflow</code>. DOCUMENTKEY / COD_PDR / RIF_EXT dal dettaglio;
+        <code>EXT_DATA_ESEC</code> = oggi (AAAAMMGG).
+      </p>
+      <button type="button" id="scrapeAgainGasA01150" class="secondary full">Refresh dati</button>
+      <label class="field">
+        <span>DOCUMENTKEY</span>
+        <input type="text" id="gasA01150Documentkey" autocomplete="off" spellcheck="false" />
+      </label>
+      <label class="field">
+        <span>RIF_EXT</span>
+        <input type="text" id="gasA01150RifExt" autocomplete="off" spellcheck="false" />
+      </label>
+      <label class="field">
+        <span>COD_PDR</span>
+        <input type="text" id="gasA01150CodPdr" autocomplete="off" spellcheck="false" />
+      </label>
+      <label class="field">
+        <span>EXT_DATA_ESEC</span>
+        <input type="text" id="gasA01150ExtData" autocomplete="off" spellcheck="false" />
+      </label>
+      <p class="hint vt1-auth-hint">
+        <strong>Authorization</strong> e cookie: stesse impostazioni VT1 in
+        <a href="#" id="openOptionsGasA01150Auth">Impostazioni</a>.
+      </p>
+      <label class="field">
+        <span>Cookie (opzionale, es. JSESSIONID=…)</span>
+        <input type="text" id="gasA01150Cookie" autocomplete="off" spellcheck="false" />
+      </label>
+      <label class="field">
+        <span>Dati da amc.request (id_request + input)</span>
+        <textarea id="gasA01150DbJson" rows="8" spellcheck="false" readonly></textarea>
+      </label>
+      <label class="field">
+        <span>Corpo JSON</span>
+        <textarea id="gasA01150Json" rows="10" spellcheck="false"></textarea>
+      </label>
+      <button type="button" id="gasA01150ApplyFields" class="secondary full">Aggiorna JSON dai campi sopra</button>
+      <button type="button" id="gasA01150Send" class="primary">Invia richiesta</button>
+      <div id="statusGasA01150" class="status" aria-live="polite"></div>
+      <pre id="logGasA01150" class="log hidden"></pre>
+      <button type="button" id="backFromGasA01150" class="linkish">← Indietro</button>
+      <p class="footer tight">
+        <a href="#" id="openOptionsGasA01150">Impostazioni</a>
+      </p>
+    </section>
+
+    <!-- GAS A01 DTEC → /managecomunication/send-esiti -->
+    <section id="screenGasA01Dtec" class="hidden">
+      <h1>GAS A01 DTEC</h1>
+      <p class="hint">
+        Solo POST su <code>/managecomunication/send-esiti</code>
+        (evento <code>023</code>, flusso <code>0300</code>).
+        Per <code>canale_com</code> usa manualmente <strong>Switch ATOA/FILE</strong> se serve.
+      </p>
+      <button type="button" id="scrapeAgainGasA01Dtec" class="secondary full">Refresh dati</button>
+      <label class="field">
+        <span>requestId (body)</span>
+        <input type="text" id="gasA01DtecRequestId" autocomplete="off" spellcheck="false" />
+      </label>
+      <label class="field">
+        <span>POD</span>
+        <input type="text" id="gasA01DtecPod" autocomplete="off" spellcheck="false" />
+      </label>
+      <p class="subhint">Dati cliente (da pagina → Z_*)</p>
+      <label class="field">
+        <span>Z_NOME</span>
+        <input type="text" id="gasA01DtecNome" autocomplete="off" spellcheck="false" />
+      </label>
+      <label class="field">
+        <span>Z_COGNOME</span>
+        <input type="text" id="gasA01DtecCognome" autocomplete="off" spellcheck="false" />
+      </label>
+      <label class="field">
+        <span>Z_RAGSOC</span>
+        <input type="text" id="gasA01DtecRagsoc" autocomplete="off" spellcheck="false" />
+      </label>
+      <label class="field">
+        <span>Z_CODICE_FISCALE</span>
+        <input type="text" id="gasA01DtecCf" autocomplete="off" spellcheck="false" />
+      </label>
+      <label class="field">
+        <span>Z_PARTITA_IVA</span>
+        <input type="text" id="gasA01DtecPiva" autocomplete="off" spellcheck="false" />
+      </label>
+      <p class="subhint">Dati tecnici</p>
+      <label class="field">
+        <span>EXT_SERNR</span>
+        <input type="text" id="gasA01DtecSernr" autocomplete="off" spellcheck="false" />
+      </label>
+      <label class="field">
+        <span>EXT_ZZTIPOC</span>
+        <input type="text" id="gasA01DtecZztipoc" autocomplete="off" spellcheck="false" />
+      </label>
+      <label class="field">
+        <span>EXT_COD_CLASSE</span>
+        <input type="text" id="gasA01DtecCodClasse" autocomplete="off" spellcheck="false" />
+      </label>
+      <label class="field">
+        <span>EXT_CABINA_REMI</span>
+        <input type="text" id="gasA01DtecCabinaRemi" autocomplete="off" spellcheck="false" />
+      </label>
+      <p class="hint vt1-auth-hint">
+        <strong>Authorization</strong> e cookie: stesse impostazioni VT1 in
+        <a href="#" id="openOptionsGasA01DtecAuth">Impostazioni</a>.
+      </p>
+      <label class="field">
+        <span>Cookie (opzionale, es. JSESSIONID=…)</span>
+        <input type="text" id="gasA01DtecCookie" autocomplete="off" spellcheck="false" />
+      </label>
+      <label class="field">
+        <span>Dati da amc.request (id_request + input)</span>
+        <textarea id="gasA01DtecDbJson" rows="8" spellcheck="false" readonly></textarea>
+      </label>
+      <label class="field">
+        <span>Corpo JSON</span>
+        <textarea id="gasA01DtecJson" rows="10" spellcheck="false"></textarea>
+      </label>
+      <button type="button" id="gasA01DtecApplyFields" class="secondary full">Aggiorna JSON dai campi sopra</button>
+      <button type="button" id="gasA01DtecSend" class="primary">Invia richiesta</button>
+      <div id="statusGasA01Dtec" class="status" aria-live="polite"></div>
+      <pre id="logGasA01Dtec" class="log hidden"></pre>
+      <button type="button" id="backFromGasA01Dtec" class="linkish">← Indietro</button>
+      <p class="footer tight">
+        <a href="#" id="openOptionsGasA01Dtec">Impostazioni</a>
+      </p>
+    </section>
+
+    <!-- SG1 GAS flusso 0300 -->
+    <section id="screenSg1" class="hidden">
+      <h1>GAS SG1 300</h1>
+      <p class="hint">Stesso endpoint VT1. DOCUMENTKEY / POD / anagrafica letti dal dettaglio richiesta.</p>
+      <button type="button" id="scrapeAgainSg1" class="secondary full">Refresh dati</button>
+      <label class="field">
+        <span>DOCUMENTKEY</span>
+        <input type="text" id="sg1Documentkey" autocomplete="off" spellcheck="false" />
+      </label>
+      <label class="field">
+        <span>RIF_EXT</span>
+        <input type="text" id="sg1RifExt" autocomplete="off" spellcheck="false" />
+      </label>
+      <label class="field">
+        <span>POD (PDR)</span>
+        <input type="text" id="sg1Pod" autocomplete="off" spellcheck="false" />
+      </label>
+      <p class="subhint">Dati cliente (da pagina → Z_*)</p>
+      <label class="field">
+        <span>Z_NOME</span>
+        <input type="text" id="sg1Nome" autocomplete="off" spellcheck="false" />
+      </label>
+      <label class="field">
+        <span>Z_COGNOME</span>
+        <input type="text" id="sg1Cognome" autocomplete="off" spellcheck="false" />
+      </label>
+      <label class="field">
+        <span>Z_RAGSOC</span>
+        <input type="text" id="sg1Ragsoc" autocomplete="off" spellcheck="false" />
+      </label>
+      <label class="field">
+        <span>Z_CODICE_FISCALE</span>
+        <input type="text" id="sg1Cf" autocomplete="off" spellcheck="false" />
+      </label>
+      <label class="field">
+        <span>Z_PARTITA_IVA</span>
+        <input type="text" id="sg1Piva" autocomplete="off" spellcheck="false" />
+      </label>
+      <p class="subhint">Dati tecnici (manuale se non in pagina)</p>
+      <label class="field">
+        <span>EXT_SERNR</span>
+        <input type="text" id="sg1Sernr" autocomplete="off" spellcheck="false" />
+      </label>
+      <label class="field">
+        <span>EXT_ZZTIPOC</span>
+        <input type="text" id="sg1Zztipoc" autocomplete="off" spellcheck="false" />
+      </label>
+      <label class="field">
+        <span>EXT_COD_CLASSE</span>
+        <input type="text" id="sg1CodClasse" autocomplete="off" spellcheck="false" />
+      </label>
+      <label class="field">
+        <span>EXT_CABINA_REMI</span>
+        <input type="text" id="sg1CabinaRemi" autocomplete="off" spellcheck="false" />
+      </label>
+      <p class="hint vt1-auth-hint">
+        <strong>Authorization</strong> e cookie: stesse impostazioni VT1 in
+        <a href="#" id="openOptionsSg1Auth">Impostazioni</a>.
+      </p>
+      <label class="field">
+        <span>Cookie (opzionale, es. JSESSIONID=…)</span>
+        <input type="text" id="sg1Cookie" autocomplete="off" spellcheck="false" />
+      </label>
+      <label class="field">
+        <span>Dati da amc.request (id_request + input)</span>
+        <textarea id="sg1DbJson" rows="8" spellcheck="false" readonly></textarea>
+      </label>
+      <label class="field">
+        <span>Corpo JSON</span>
+        <textarea id="sg1Json" rows="10" spellcheck="false"></textarea>
+      </label>
+      <button type="button" id="sg1ApplyFields" class="secondary full">Aggiorna JSON dai campi sopra</button>
+      <button type="button" id="sg1Send" class="primary">Invia richiesta</button>
+      <div id="statusSg1" class="status" aria-live="polite"></div>
+      <pre id="logSg1" class="log hidden"></pre>
+      <button type="button" id="backFromSg1" class="linkish">← Indietro</button>
+      <p class="footer tight">
+        <a href="#" id="openOptionsSg1">Impostazioni</a>
+      </p>
+    </section>
+
+    <!-- SG1 DTMS → /managecomunication/send-esiti -->
+    <section id="screenSg1Dtms" class="hidden">
+      <h1>GAS SG1 DTMS</h1>
+      <p class="hint">
+        Solo POST su <code>/managecomunication/send-esiti</code> (date = oggi).
+        Per <code>canale_com</code> usa manualmente <strong>Switch ATOA/FILE</strong>
+        prima e dopo, se serve (nel mezzo puoi fare altre operazioni).
+      </p>
+      <button type="button" id="scrapeAgainSg1Dtms" class="secondary full">Refresh dati</button>
+      <label class="field">
+        <span>requestId (body)</span>
+        <input type="text" id="sg1DtmsRequestId" autocomplete="off" spellcheck="false" />
+      </label>
+      <label class="field">
+        <span>POD</span>
+        <input type="text" id="sg1DtmsPod" autocomplete="off" spellcheck="false" />
+      </label>
+      <label class="field">
+        <span>RIF_EXT</span>
+        <input type="text" id="sg1DtmsRifExt" autocomplete="off" spellcheck="false" />
+      </label>
+      <label class="field">
+        <span>EXT_SERNR</span>
+        <input type="text" id="sg1DtmsSernr" autocomplete="off" spellcheck="false" />
+      </label>
+      <label class="field">
+        <span>EXT_VOL_ANN_SOST</span>
+        <input type="text" id="sg1DtmsVolAnn" autocomplete="off" spellcheck="false" />
+      </label>
+      <label class="field">
+        <span>Z_LETT_SERNR_SOST</span>
+        <input type="text" id="sg1DtmsLettSost" autocomplete="off" spellcheck="false" />
+      </label>
+      <label class="field">
+        <span>Z_LETT_SERNR_EFF</span>
+        <input type="text" id="sg1DtmsLettEff" autocomplete="off" spellcheck="false" />
+      </label>
+      <p class="hint vt1-auth-hint">
+        <strong>Authorization</strong> e cookie: stesse impostazioni VT1 in
+        <a href="#" id="openOptionsSg1DtmsAuth">Impostazioni</a>.
+      </p>
+      <label class="field">
+        <span>Cookie (opzionale, es. JSESSIONID=…)</span>
+        <input type="text" id="sg1DtmsCookie" autocomplete="off" spellcheck="false" />
+      </label>
+      <label class="field">
+        <span>Dati da amc.request (id_request + input)</span>
+        <textarea id="sg1DtmsDbJson" rows="8" spellcheck="false" readonly></textarea>
+      </label>
+      <label class="field">
+        <span>Corpo JSON</span>
+        <textarea id="sg1DtmsJson" rows="10" spellcheck="false"></textarea>
+      </label>
+      <button type="button" id="sg1DtmsApplyFields" class="secondary full">Aggiorna JSON dai campi sopra</button>
+      <button type="button" id="sg1DtmsSend" class="primary">Invia richiesta</button>
+      <div id="statusSg1Dtms" class="status" aria-live="polite"></div>
+      <pre id="logSg1Dtms" class="log hidden"></pre>
+      <button type="button" id="backFromSg1Dtms" class="linkish">← Indietro</button>
+      <p class="footer tight">
+        <a href="#" id="openOptionsSg1Dtms">Impostazioni</a>
+      </p>
+    </section>
+
+    <!-- SE1 DTEC → /managecomunication/send-esiti -->
+    <section id="screenSe1Dtec" class="hidden">
+      <h1>ELE SE1 DTEC</h1>
+      <p class="hint">
+        Solo POST su <code>/managecomunication/send-esiti</code>
+        (<code>EXT_DT_DECOR_D</code> = oggi). Per <code>canale_com</code> usa
+        manualmente <strong>Switch ATOA/FILE</strong> se serve.
+      </p>
+      <button type="button" id="scrapeAgainSe1Dtec" class="secondary full">Refresh dati</button>
+      <label class="field">
+        <span>requestId (body)</span>
+        <input type="text" id="se1DtecRequestId" autocomplete="off" spellcheck="false" />
+      </label>
+      <label class="field">
+        <span>POD</span>
+        <input type="text" id="se1DtecPod" autocomplete="off" spellcheck="false" />
+      </label>
+      <label class="field">
+        <span>RIF_EXT</span>
+        <input type="text" id="se1DtecRifExt" autocomplete="off" spellcheck="false" />
+      </label>
+      <label class="field">
+        <span>COD_CONTR_DISP</span>
+        <input type="text" id="se1DtecCodContr" autocomplete="off" spellcheck="false" />
+      </label>
+      <label class="field">
+        <span>EXT_SERNR_ATT (anche REA/POT)</span>
+        <input type="text" id="se1DtecSernr" autocomplete="off" spellcheck="false" />
+      </label>
+      <label class="field">
+        <span>EXT_POT_IMP</span>
+        <input type="text" id="se1DtecPotImp" autocomplete="off" spellcheck="false" />
+      </label>
+      <label class="field">
+        <span>EXT_POT_DISP</span>
+        <input type="text" id="se1DtecPotDisp" autocomplete="off" spellcheck="false" />
+      </label>
+      <label class="field">
+        <span>EXT_OPZ_TARIFFA</span>
+        <input type="text" id="se1DtecOpzTariffa" autocomplete="off" spellcheck="false" />
+      </label>
+      <label class="field">
+        <span>EXT_TENS_ALIM</span>
+        <input type="text" id="se1DtecTensAlim" autocomplete="off" spellcheck="false" />
+      </label>
+      <label class="field">
+        <span>Z_PUNTODISPACCIAMENTO</span>
+        <input type="text" id="se1DtecPuntoDisp" autocomplete="off" spellcheck="false" />
+      </label>
+      <p class="hint vt1-auth-hint">
+        <strong>Authorization</strong> e cookie: stesse impostazioni VT1 in
+        <a href="#" id="openOptionsSe1DtecAuth">Impostazioni</a>.
+      </p>
+      <label class="field">
+        <span>Cookie (opzionale, es. JSESSIONID=…)</span>
+        <input type="text" id="se1DtecCookie" autocomplete="off" spellcheck="false" />
+      </label>
+      <label class="field">
+        <span>Dati da amc.request (id_request + input)</span>
+        <textarea id="se1DtecDbJson" rows="8" spellcheck="false" readonly></textarea>
+      </label>
+      <label class="field">
+        <span>Corpo JSON</span>
+        <textarea id="se1DtecJson" rows="10" spellcheck="false"></textarea>
+      </label>
+      <button type="button" id="se1DtecApplyFields" class="secondary full">Aggiorna JSON dai campi sopra</button>
+      <button type="button" id="se1DtecSend" class="primary">Invia richiesta</button>
+      <div id="statusSe1Dtec" class="status" aria-live="polite"></div>
+      <pre id="logSe1Dtec" class="log hidden"></pre>
+      <button type="button" id="backFromSe1Dtec" class="linkish">← Indietro</button>
+      <p class="footer tight">
+        <a href="#" id="openOptionsSe1Dtec">Impostazioni</a>
+      </p>
+    </section>
+
+    <!-- Batch run APN → /batch/invoke -->
+    <section id="screenBatchApn" class="hidden">
+      <h1>APN BATCH MS_083</h1>
+      <p class="hint">
+        Endpoint <code>/batch/invoke</code>. Il <code>runId</code> usa la data odierna
+        (<code>collaudo-fl-passivi-YYYYMMDD-001</code>).
+      </p>
+      <button type="button" id="batchApnRefreshDates" class="secondary full">Aggiorna runId con data odierna</button>
+      <label class="field">
+        <span>runId</span>
+        <input type="text" id="batchApnRunId" autocomplete="off" spellcheck="false" />
+      </label>
+      <label class="field">
+        <span>batchType</span>
+        <input type="text" id="batchApnBatchType" autocomplete="off" spellcheck="false" />
+      </label>
+      <label class="field">
+        <span>dlSiiVariantCode</span>
+        <input type="text" id="batchApnVariant" autocomplete="off" spellcheck="false" />
+      </label>
+      <p class="hint vt1-auth-hint">
+        <strong>Authorization</strong> e cookie: stesse impostazioni VT1 in
+        <a href="#" id="openOptionsBatchApnAuth">Impostazioni</a>.
+      </p>
+      <label class="field">
+        <span>Cookie (opzionale)</span>
+        <input type="text" id="batchApnCookie" autocomplete="off" spellcheck="false" />
+      </label>
+      <label class="field">
+        <span>Corpo JSON</span>
+        <textarea id="batchApnJson" rows="6" spellcheck="false"></textarea>
+      </label>
+      <button type="button" id="batchApnApplyFields" class="secondary full">Aggiorna JSON dai campi</button>
+      <button type="button" id="batchApnSend" class="primary">Invia batch</button>
+      <div id="statusBatchApn" class="status" aria-live="polite"></div>
+      <pre id="logBatchApn" class="log hidden"></pre>
+      <button type="button" id="backFromBatchApn" class="linkish">← Indietro</button>
+      <p class="footer tight">
+        <a href="#" id="openOptionsBatchApn">Impostazioni</a>
+      </p>
+    </section>
   </main>
   <script src="auth-config.js"></script>
+  <script src="request-db.js"></script>
   <script src="popup.js"></script>
 </body>
 </html>

@@ -1,0 +1,37 @@
+{
+  "stagingAreaDLScartiTestataId": null,
+  "evento": null,
+  "dataComunicazioneSii": null,
+  "prestazione": {
+    "header": {
+      "distributore": "PA_DS10D0000013",
+      "venditore": "PA_VT10V0000000",
+      "causale": "A01",
+      "flusso": "0100",
+      "user": "system",
+      "servizio": "A01",
+      "operazione": "A01.0100",
+      "erogatore": null,
+      "fruitore": null,
+      "esito": "OK",
+      "descrizioneEsito": null
+    },
+    "requests": [
+      {
+        "fields": [
+          { "field": "CODCAUS", "value": "A01" },
+          { "field": "COD_FLUSSO", "value": "0100" },
+          { "field": "PIVA_MITT", "value": "02221101203" },
+          { "field": "PIVA_DEST", "value": "00489490011" },
+          { "field": "DOCUMENTKEY", "value": "" },
+          { "field": "RIF_EXT", "value": null },
+          { "field": "DES_ESITO_VERIFICA_AMM", "value": "1" },
+          { "field": "EXT_CODERR_AEEG", "value": null },
+          { "field": "EXT_ANNOTAZIONI", "value": null },
+          { "field": "COD_PDR", "value": "" }
+        ]
+      }
+    ],
+    "strutturaRipetibile": null
+  }
+}

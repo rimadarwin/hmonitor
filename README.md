@@ -93,6 +93,14 @@ Switch di `amc.request.canale_com` tra `ATOA` e `FILE` in base al valore corrent
 
 Risposta con log `changes` (prima/dopo), stesso formato di `/update`.
 
+### `POST /riporta-sospeso`
+
+Su `amc.sap_messages` per il `request_code`: `message_state = 'SOSPESO'`, `attiva_sap = ''`.
+
+```json
+{ "request_code": "V00000030814" }
+```
+
 ---
 
 ## Estensione Chrome (`chrome-extension-update-dates/`)
@@ -101,8 +109,10 @@ Risposta con log `changes` (prima/dopo), stesso formato di `/update`.
 |---|---|---|
 | Aggiorna date | `POST {apiBaseUrl}/update` su Render | Nessuna |
 | Switch ATOA/FILE | `POST {apiBaseUrl}/switch-canale` | Nessuna |
+| Riporta in sospeso | `POST {apiBaseUrl}/riporta-sospeso` | Nessuna |
 | VT1 ELE 150 | `POST` su Heroku DLSII inboundflow | Bearer/Basic + cookie |
 | WP1 ELE 150 | Stesso endpoint VT1 | Stesse credenziali VT1 |
+| SG1 GAS 300 | Stesso endpoint VT1 (`SW1.0300`) | Stesse credenziali VT1 |
 
 Default API date: `https://hmonitor-uhk9.onrender.com`
 

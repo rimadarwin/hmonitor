@@ -25,11 +25,109 @@ def _normalize_canale(raw: Optional[str]) -> str:
     return (raw or "").strip().upper()
 
 
-def run_switch_canale_com(request_code: str) -> UpdateResult:
+def run_set_canale_com(request_code: str, target: str) -> UpdateResult:
+    """Imposta canale_com al valore richiesto (ATOA o FILE), senza toggle."""
+    code = (request_code or "").strip()
+    if not code:
+        return UpdateResult(ok=False, request_code="", error="Codice richiesta non inserito.")
+
+    desired = _normalize_canale(target)
+    if desired not in _SWITCH_MAP:
+        return UpdateResult(
+            ok=False,
+            request_code=code,
+            error=f"target canale_com non valido: '{target}' (attesi ATOA o FILE).",
+        )
+
+    database_url = os.environ.get("DATABASE_URL")
+    if not database_url:
+        return UpdateResult(
+            ok=False,
+            request_code=code,
+            error="DATABASE_URL non configurata. Imposta la variabile o usa il file .env.",
+        )
+
+    conn = None
+    try:
+        conn = psycopg2.connect(database_url, sslmode="require")
+        cursor = conn.cursor()
+
+        cursor.execute(
+            "SELECT canale_com FROM amc.request WHERE request_code = %s",
+            (code,),
+        )
+        row = cursor.fetchone()
+        if not row:
+            return UpdateResult(
+                ok=False,
+                request_code=code,
+                error=f"Nessuna riga trovata in amc.request per request_code = '{code}'",
+            )
+
+        current_raw = row[0]
+        current = _normalize_canale(current_raw if current_raw is None else str(current_raw))
+        if current == desired:
+            print(f"[OK] amc.request.canale_com già {desired} (nessun update)")
+            return UpdateResult(
+                ok=True,
+                request_code=code,
+                changes=[
+                    ChangeLogEntry(
+                        tabella="amc.request",
+                        campo="canale_com",
+                        vecchio=current or "(vuoto)",
+                        nuovo=desired,
+                        skipped=False,
+                        note="Valore già impostato",
+                    )
+                ],
+            )
+
+        print(f"[OK] amc.request.canale_com: {current} -> {desired}")
+        cursor.execute(
+            "UPDATE amc.request SET canale_com = %s WHERE request_code = %s",
+            (desired, code),
+        )
+        conn.commit()
+
+        return UpdateResult(
+            ok=True,
+            request_code=code,
+            changes=[
+                ChangeLogEntry(
+                    tabella="amc.request",
+                    campo="canale_com",
+                    vecchio=current or "(vuoto)",
+                    nuovo=desired,
+                    skipped=False,
+                )
+            ],
+        )
+
+    except psycopg2.Error as e:
+        if conn:
+            conn.rollback()
+        msg = e.pgerror or str(e)
+        return UpdateResult(ok=False, request_code=code, error=f"Errore database: {msg}")
+
+    except Exception as e:
+        if conn:
+            conn.rollback()
+        return UpdateResult(ok=False, request_code=code, error=f"{type(e).__name__}: {e}")
+
+    finally:
+        if conn:
+            conn.close()
+
+
+def run_switch_canale_com(request_code: str, target: Optional[str] = None) -> UpdateResult:
     """
-    Legge canale_com per la richiesta e lo inverte ATOA <-> FILE.
-    Restituisce un log con valore prima/dopo (stesso formato UpdateResult delle date).
+    Se target è ATOA/FILE: imposta quel valore.
+    Altrimenti legge canale_com e lo inverte ATOA <-> FILE.
     """
+    if target is not None and str(target).strip():
+        return run_set_canale_com(request_code, target)
+
     code = (request_code or "").strip()
     if not code:
         return UpdateResult(ok=False, request_code="", error="Codice richiesta non inserito.")

@@ -1,0 +1,35 @@
+{
+  "prestazione": {
+    "header": {
+      "distributore": "PA_DS13D00000AU",
+      "venditore": "PA_VT13V0000000",
+      "causale": "AV1",
+      "flusso": "0150",
+      "user": "BS_030_001",
+      "servizio": "AV1",
+      "operazione": "AV1.0150",
+      "erogatore": "UT0261",
+      "fruitore": "AU"
+    },
+    "requests": [
+      {
+        "fields": [
+          { "field": "CODCAUS", "value": "AV1" },
+          { "field": "COD_FLUSSO", "value": "0150" },
+          { "field": "PIVA_MITT", "value": "02221101203" },
+          { "field": "PIVA_DEST", "value": "05877611003" },
+          { "field": "DOCUMENTKEY", "value": "" },
+          { "field": "EXT_STATO_RICHIESTA", "value": "1" },
+          { "field": "POD", "value": "" },
+          { "field": "EXT_DT_DECOR_D", "value": "" },
+          { "field": "EXT_TENS_FASE", "value": "BT_MONOFASE" },
+          { "field": "EXT_POT_IMP", "value": "3.0" },
+          { "field": "EXT_POT_DISP", "value": "3.30" },
+          { "field": "EXT_OPZ_TARIFFA", "value": "TD" },
+          { "field": "RIF_EXT", "value": "" }
+        ]
+      }
+    ]
+  },
+  "strutturaRipetibile": {}
+}
