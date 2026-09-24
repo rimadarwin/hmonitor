@@ -3,6 +3,7 @@
 <!--
   @author Maurizio di Sabato <maurizio.disabato@xcconsulting.it>
   @description Side panel estensione Hera - avanzamento pratiche
+  @modified 24.09.2026 - MDS | Pulsante blu Mockup CP1 (simulatore_risposta_campi)
   @modified 23.09.2026 - MDS | Pulsante blu Riporta in sospeso (amc.sap_messages)
   @modified 23.09.2026 - MDS | Riquadri JSON amc.request (id_request + input) per ogni flusso
 -->
@@ -20,6 +21,7 @@
       <button type="button" id="goDates" class="choice primary">Aggiorna data</button>
       <button type="button" id="goCanale" class="choice primary">Switch ATOA/FILE</button>
       <button type="button" id="goSospeso" class="choice primary">Riporta in sospeso</button>
+      <button type="button" id="goMockupCp1" class="choice primary">Mockup CP1</button>
       <button type="button" id="goBatchApn" class="choice accent">APN BATCH MS_083</button>
       <button type="button" id="goEleAv1" class="choice accent">ELE AV1 150</button>
       <button type="button" id="goSe1Dtec" class="choice accent">ELE SE1 DTEC</button>
@@ -92,6 +94,44 @@
       <button type="button" id="backFromSospeso" class="linkish">← Indietro</button>
       <p class="footer tight">
         <a href="#" id="openOptionsSospeso">Impostazioni API locale</a>
+      </p>
+    </section>
+
+    <!-- Mockup CP1: campi simulatore_risposta_campi -->
+    <section id="screenMockupCp1" class="hidden">
+      <h1>Mockup CP1</h1>
+      <p class="hint">
+        Legge/aggiorna su <code>amc.simulatore_risposta_campi</code> i campi
+        <code>EXT_POT_DISP</code>, <code>EXT_POT_IMP</code>, <code>USO_FORNITURA</code>, <code>POD</code>
+        per <code>id_risposta_testata</code>.
+      </p>
+      <label class="field">
+        <span>Id testata</span>
+        <input type="text" id="mockupCp1IdTestata" value="802" placeholder="802" autocomplete="off" spellcheck="false" />
+      </label>
+      <button type="button" id="mockupCp1LoadBtn" class="secondary full">Carica campi</button>
+      <label class="field">
+        <span>EXT_POT_DISP</span>
+        <input type="text" id="mockupCp1ExtPotDisp" autocomplete="off" spellcheck="false" />
+      </label>
+      <label class="field">
+        <span>EXT_POT_IMP</span>
+        <input type="text" id="mockupCp1ExtPotImp" autocomplete="off" spellcheck="false" />
+      </label>
+      <label class="field">
+        <span>USO_FORNITURA</span>
+        <input type="text" id="mockupCp1UsoFornitura" autocomplete="off" spellcheck="false" />
+      </label>
+      <label class="field">
+        <span>POD</span>
+        <input type="text" id="mockupCp1Pod" autocomplete="off" spellcheck="false" />
+      </label>
+      <button type="button" id="mockupCp1UpdateBtn" class="primary">Update</button>
+      <div id="statusMockupCp1" class="status" aria-live="polite"></div>
+      <pre id="logMockupCp1" class="log hidden"></pre>
+      <button type="button" id="backFromMockupCp1" class="linkish">← Indietro</button>
+      <p class="footer tight">
+        <a href="#" id="openOptionsMockupCp1">Impostazioni API locale</a>
       </p>
     </section>
 

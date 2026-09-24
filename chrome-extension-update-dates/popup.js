@@ -1,6 +1,7 @@
 /**
  * @author Maurizio di Sabato <maurizio.disabato@xcconsulting.it>
  * @description Popup/side panel: date, switch ATOA/FILE, flussi Heroku con populate da amc.request
+ * @modified 24.09.2026 - MDS | Schermata Mockup CP1 (load/update simulatore_risposta_campi)
  * @modified 23.09.2026 - MDS | Schermata Riporta in sospeso (POST /riporta-sospeso)
  * @modified 23.09.2026 - MDS | Populate flussi da amc.request (id_request + input) invece dello scrape
  */
@@ -1159,6 +1160,7 @@ function showScreen(name) {
   const dates = document.getElementById("screenDates");
   const canale = document.getElementById("screenCanale");
   const sospeso = document.getElementById("screenSospeso");
+  const mockupCp1 = document.getElementById("screenMockupCp1");
   const vt1 = document.getElementById("screenVt1");
   const eleAv1 = document.getElementById("screenEleAv1");
   const wp1 = document.getElementById("screenWp1");
@@ -1173,6 +1175,7 @@ function showScreen(name) {
   dates.classList.toggle("hidden", name !== "dates");
   if (canale) canale.classList.toggle("hidden", name !== "canale");
   if (sospeso) sospeso.classList.toggle("hidden", name !== "sospeso");
+  if (mockupCp1) mockupCp1.classList.toggle("hidden", name !== "mockupCp1");
   if (eleAv1) eleAv1.classList.toggle("hidden", name !== "eleAv1");
   vt1.classList.toggle("hidden", name !== "vt1");
   if (wp1) wp1.classList.toggle("hidden", name !== "wp1");
@@ -1206,6 +1209,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const goDates = document.getElementById("goDates");
   const goCanale = document.getElementById("goCanale");
   const goSospeso = document.getElementById("goSospeso");
+  const goMockupCp1 = document.getElementById("goMockupCp1");
   const goEleAv1 = document.getElementById("goEleAv1");
   const goVt1 = document.getElementById("goVt1");
   const goWp1 = document.getElementById("goWp1");
@@ -1233,6 +1237,17 @@ document.addEventListener("DOMContentLoaded", () => {
   const statusSospeso = document.getElementById("statusSospeso");
   const logSospeso = document.getElementById("logSospeso");
   const backFromSospeso = document.getElementById("backFromSospeso");
+
+  const mockupCp1IdTestata = document.getElementById("mockupCp1IdTestata");
+  const mockupCp1LoadBtn = document.getElementById("mockupCp1LoadBtn");
+  const mockupCp1ExtPotDisp = document.getElementById("mockupCp1ExtPotDisp");
+  const mockupCp1ExtPotImp = document.getElementById("mockupCp1ExtPotImp");
+  const mockupCp1UsoFornitura = document.getElementById("mockupCp1UsoFornitura");
+  const mockupCp1Pod = document.getElementById("mockupCp1Pod");
+  const mockupCp1UpdateBtn = document.getElementById("mockupCp1UpdateBtn");
+  const statusMockupCp1 = document.getElementById("statusMockupCp1");
+  const logMockupCp1 = document.getElementById("logMockupCp1");
+  const backFromMockupCp1 = document.getElementById("backFromMockupCp1");
 
   const scrapeAgain = document.getElementById("scrapeAgain");
   const vt1Documentkey = document.getElementById("vt1Documentkey");
@@ -1416,6 +1431,7 @@ document.addEventListener("DOMContentLoaded", () => {
     document.getElementById("openOptionsDates"),
     document.getElementById("openOptionsCanale"),
     document.getElementById("openOptionsSospeso"),
+    document.getElementById("openOptionsMockupCp1"),
     document.getElementById("openOptionsVt1"),
     document.getElementById("openOptionsVt1Auth"),
     document.getElementById("openOptionsEleAv1"),
@@ -1705,6 +1721,15 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 
+  goMockupCp1.addEventListener("click", async () => {
+    showScreen("mockupCp1");
+    setStatus(statusMockupCp1, "", "");
+    logMockupCp1.classList.add("hidden");
+    logMockupCp1.textContent = "";
+    if (!mockupCp1IdTestata.value.trim()) mockupCp1IdTestata.value = "802";
+    await loadMockupCp1Fields();
+  });
+
   goVt1.addEventListener("click", async () => {
     showScreen("vt1");
     logVt1.classList.add("hidden");
@@ -1788,6 +1813,7 @@ document.addEventListener("DOMContentLoaded", () => {
   backFromDates.addEventListener("click", () => showScreen("home"));
   backFromCanale.addEventListener("click", () => showScreen("home"));
   backFromSospeso.addEventListener("click", () => showScreen("home"));
+  backFromMockupCp1.addEventListener("click", () => showScreen("home"));
   backFromVt1.addEventListener("click", () => showScreen("home"));
   backFromEleAv1.addEventListener("click", () => showScreen("home"));
   backFromWp1.addEventListener("click", () => showScreen("home"));
@@ -1952,6 +1978,109 @@ document.addEventListener("DOMContentLoaded", () => {
       setStatus(statusSospeso, msg, "err");
     } finally {
       runSospesoBtn.disabled = false;
+    }
+  });
+
+  /** Carica i campi CP1 da amc.simulatore_risposta_campi. */
+  async function loadMockupCp1Fields() {
+    const idTestata = mockupCp1IdTestata.value.trim() || "802";
+    mockupCp1IdTestata.value = idTestata;
+    logMockupCp1.classList.add("hidden");
+    logMockupCp1.textContent = "";
+    mockupCp1LoadBtn.disabled = true;
+    setStatus(statusMockupCp1, "Carico campi da DB…", "");
+
+    try {
+      const base = await getApiBase();
+      const res = await fetch(`${base}/mockup-cp1/load`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id_risposta_testata: idTestata }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.ok) {
+        setStatus(
+          statusMockupCp1,
+          data.error || data.message || `Errore HTTP ${res.status}`,
+          "err"
+        );
+        return;
+      }
+      const f = data.fields || {};
+      mockupCp1ExtPotDisp.value = f.EXT_POT_DISP || "";
+      mockupCp1ExtPotImp.value = f.EXT_POT_IMP || "";
+      mockupCp1UsoFornitura.value = f.USO_FORNITURA || "";
+      mockupCp1Pod.value = f.POD || "";
+      const missing = Array.isArray(data.missing) ? data.missing : [];
+      setStatus(
+        statusMockupCp1,
+        missing.length
+          ? `Campi caricati (mancanti in DB: ${missing.join(", ")}).`
+          : `Campi caricati · id_risposta_testata=${data.id_risposta_testata}.`,
+        missing.length ? "err" : "ok"
+      );
+    } catch (e) {
+      const msg =
+        e instanceof TypeError && String(e.message).includes("fetch")
+          ? "Impossibile contattare il server. Avvia update_dates_api_server.py o verifica l’URL Render."
+          : String(e.message || e);
+      setStatus(statusMockupCp1, msg, "err");
+    } finally {
+      mockupCp1LoadBtn.disabled = false;
+    }
+  }
+
+  mockupCp1LoadBtn.addEventListener("click", async () => {
+    await loadMockupCp1Fields();
+  });
+
+  mockupCp1UpdateBtn.addEventListener("click", async () => {
+    const idTestata = mockupCp1IdTestata.value.trim() || "802";
+    mockupCp1IdTestata.value = idTestata;
+    logMockupCp1.classList.add("hidden");
+    logMockupCp1.textContent = "";
+    mockupCp1UpdateBtn.disabled = true;
+    setStatus(statusMockupCp1, "Aggiorno campi su DB…", "");
+
+    try {
+      const base = await getApiBase();
+      const res = await fetch(`${base}/mockup-cp1/update`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id_risposta_testata: idTestata,
+          fields: {
+            EXT_POT_DISP: mockupCp1ExtPotDisp.value,
+            EXT_POT_IMP: mockupCp1ExtPotImp.value,
+            USO_FORNITURA: mockupCp1UsoFornitura.value,
+            POD: mockupCp1Pod.value,
+          },
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.ok) {
+        setStatus(
+          statusMockupCp1,
+          data.error || data.message || `Errore HTTP ${res.status}`,
+          "err"
+        );
+        if (data.changes) {
+          logMockupCp1.textContent = formatChanges(data.changes);
+          logMockupCp1.classList.remove("hidden");
+        }
+        return;
+      }
+      setStatus(statusMockupCp1, "Update completato.", "ok");
+      logMockupCp1.textContent = formatChanges(data.changes);
+      logMockupCp1.classList.remove("hidden");
+    } catch (e) {
+      const msg =
+        e instanceof TypeError && String(e.message).includes("fetch")
+          ? "Impossibile contattare il server. Avvia update_dates_api_server.py o verifica l’URL Render."
+          : String(e.message || e);
+      setStatus(statusMockupCp1, msg, "err");
+    } finally {
+      mockupCp1UpdateBtn.disabled = false;
     }
   });
 

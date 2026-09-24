@@ -2,6 +2,7 @@
 """
 @author Maurizio di Sabato <maurizio.disabato@xcconsulting.it>
 @description Server Flask per estensione Chrome (date, switch canale, request-data)
+@modified 24.09.2026 - MDS | Endpoint Mockup CP1 load/update (simulatore_risposta_campi)
 @modified 23.09.2026 - MDS | Endpoint POST /riporta-sospeso (amc.sap_messages)
 @modified 23.09.2026 - MDS | Endpoint POST /request-data (id_request + input da amc.request)
 
@@ -23,6 +24,7 @@ from update_request_dates import UpdateResult, run_update_request_dates
 from switch_canale_com import run_switch_canale_com
 from fetch_request_data import run_fetch_request_data
 from riporta_in_sospeso import run_riporta_in_sospeso
+from mockup_cp1 import run_mockup_cp1_load, run_mockup_cp1_update
 
 DEFAULT_PORT = 8765
 
@@ -63,6 +65,8 @@ def root():
                 "/switch-canale",
                 "/request-data",
                 "/riporta-sospeso",
+                "/mockup-cp1/load",
+                "/mockup-cp1/update",
             ],
         }
     )
@@ -130,6 +134,49 @@ def riporta_sospeso():
     return jsonify(_serialize_result(result)), status
 
 
+@app.post("/mockup-cp1/load")
+def mockup_cp1_load():
+    """
+    Carica i campi CP1 da amc.simulatore_risposta_campi.
+    Body: { "id_risposta_testata": 802 }
+    """
+    data = request.get_json(silent=True) or {}
+    id_testata = data.get("id_risposta_testata", data.get("id_testata", 802))
+    result = run_mockup_cp1_load(id_testata)
+    status = 200 if result.ok else 400
+    return jsonify(
+        {
+            "ok": result.ok,
+            "id_risposta_testata": result.id_risposta_testata,
+            "fields": result.fields,
+            "missing": result.missing,
+            "error": result.error,
+        }
+    ), status
+
+
+@app.post("/mockup-cp1/update")
+def mockup_cp1_update():
+    """
+    Aggiorna i campi CP1 su amc.simulatore_risposta_campi.
+    Body: {
+      "id_risposta_testata": 802,
+      "fields": {
+        "EXT_POT_DISP": "…",
+        "EXT_POT_IMP": "…",
+        "USO_FORNITURA": "…",
+        "POD": "…"
+      }
+    }
+    """
+    data = request.get_json(silent=True) or {}
+    id_testata = data.get("id_risposta_testata", data.get("id_testata"))
+    fields = data.get("fields") or {}
+    result = run_mockup_cp1_update(id_testata, fields)
+    status = 200 if result.ok else 400
+    return jsonify(_serialize_result(result)), status
+
+
 def main():
     # Render (e simili) impostano PORT; in locale si usa UPDATE_DATES_API_PORT o default.
     port = int(
@@ -142,6 +189,8 @@ def main():
     print("  POST /switch-canale  JSON: {\"request_code\": \"…\", \"target\": \"FILE\"?}")
     print("  POST /request-data   JSON: {\"request_code\": \"…\"}")
     print("  POST /riporta-sospeso JSON: {\"request_code\": \"…\"}")
+    print("  POST /mockup-cp1/load   JSON: {\"id_risposta_testata\": 802}")
+    print("  POST /mockup-cp1/update JSON: {\"id_risposta_testata\": 802, \"fields\": {…}}")
     print("  GET  /health")
     app.run(host=host, port=port, threaded=True)
 

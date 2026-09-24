@@ -102,6 +102,30 @@ Se esistono più righe con lo stesso codice, aggiorna solo l’ultima (`create_t
 { "request_code": "V00000030814" }
 ```
 
+### `POST /mockup-cp1/load`
+
+Carica da `amc.simulatore_risposta_campi` i campi `EXT_POT_DISP`, `EXT_POT_IMP`, `USO_FORNITURA`, `POD`.
+
+```json
+{ "id_risposta_testata": 802 }
+```
+
+### `POST /mockup-cp1/update`
+
+Aggiorna i valori dei campi CP1 per l’`id_risposta_testata` indicato.
+
+```json
+{
+  "id_risposta_testata": 802,
+  "fields": {
+    "EXT_POT_DISP": "3.3",
+    "EXT_POT_IMP": "3",
+    "USO_FORNITURA": "01",
+    "POD": "IT001E00716935"
+  }
+}
+```
+
 ---
 
 ## Estensione Chrome (`chrome-extension-update-dates/`)
@@ -111,6 +135,7 @@ Se esistono più righe con lo stesso codice, aggiorna solo l’ultima (`create_t
 | Aggiorna date | `POST {apiBaseUrl}/update` su Render | Nessuna |
 | Switch ATOA/FILE | `POST {apiBaseUrl}/switch-canale` | Nessuna |
 | Riporta in sospeso | `POST {apiBaseUrl}/riporta-sospeso` | Nessuna |
+| Mockup CP1 | `POST {apiBaseUrl}/mockup-cp1/load` e `/mockup-cp1/update` | Nessuna |
 | VT1 ELE 150 | `POST` su Heroku DLSII inboundflow | Bearer/Basic + cookie |
 | WP1 ELE 150 | Stesso endpoint VT1 | Stesse credenziali VT1 |
 | SG1 GAS 300 | Stesso endpoint VT1 (`SW1.0300`) | Stesse credenziali VT1 |
