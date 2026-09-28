@@ -1,0 +1,38 @@
+{
+  "stagingAreaDLScartiTestataId": null,
+  "prestazione": {
+    "header": {
+      "distributore": "13D0000001",
+      "venditore": "13V0000000",
+      "causale": "ES1",
+      "flusso": "0100",
+      "user": "aurelio.friscia@consulenti.gruppohera.it",
+      "servizio": null,
+      "idFileModello": null,
+      "estensione": "CSV",
+      "righeTestata": "1",
+      "esito": null,
+      "descrizioneEsito": null,
+      "evento": "0S1",
+      "nomeMessaggio": null,
+      "societaDiVendita": null,
+      "codiceCausale": null,
+      "nomeDistributore": null,
+      "percorso": null
+    },
+    "template": null,
+    "righe": [
+      {
+        "fields": [
+          { "field": "CODCAUS", "value": "ES1" },
+          { "field": "COD_FLUSSO", "value": "0100" },
+          { "field": "DOCUMENTKEY", "value": "" },
+          { "field": "RIF_EXT", "value": "" },
+          { "field": "DES_ESITO_VERIFICA_AMM", "value": "1" },
+          { "field": "CODERR_AEEG", "value": "" },
+          { "field": "EXT_ANNOTAZIONI", "value": "" }
+        ]
+      }
+    ]
+  }
+}

@@ -1,6 +1,7 @@
 /**
  * @author Maurizio di Sabato <maurizio.disabato@xcconsulting.it>
  * @description Recupero e mapping dati da amc.request (API /request-data) per i body dei flussi
+ * @modified 28.09.2026 - MDS | Merge scrape UI + alias COD_FISCALE/PIVA/Codice Pratica SII
  * @modified 23.09.2026 - MDS | Flatten input + mapping campi comuni (POD/PDR, RIF_EXT, potenze, ecc.)
  */
 
@@ -96,6 +97,16 @@ function pickFlat(flat, ...aliases) {
   return "";
 }
 
+/** Primo valore non vuoto tra candidati (stringhe). */
+function firstFilled(...vals) {
+  for (const v of vals) {
+    if (v == null) continue;
+    const s = String(v).trim();
+    if (s !== "") return s;
+  }
+  return "";
+}
+
 /**
  * Valori comuni ricavati da id_request + input appiattito + request_code.
  * Usati dai form/payload dei vari flussi.
@@ -114,11 +125,15 @@ function buildCommonValuesFromDb(dbResult, requestCodeFallback) {
     "CODICE_POD",
     "CODICE_PDR"
   );
+  // RIF_EXT = codice pratica SII (priorità ai nomi espliciti SII / RIF_EXT)
   const rifExt = pickFlat(
     flat,
     "RIF_EXT",
     "CODICE_PRATICA_SII",
     "COD_PRATICA_SII",
+    "PRATICA_SII",
+    "CODICEPRATICASII",
+    "RIF_RICH",
     "CODICE_PRATICA_DISTRIBUTORE",
     "COD_PRATICA_DISTRIBUTORE",
     "CODICE_PRATICA_DISTR",
@@ -129,6 +144,30 @@ function buildCommonValuesFromDb(dbResult, requestCodeFallback) {
     "COD_PRATICA"
   );
   const documentkey = pickFlat(flat, "DOCUMENTKEY", "NUMERO_RICHIESTA") || code;
+
+  // In amc.request il CF cliente è quasi sempre COD_FISCALE (non CODICE_FISCALE)
+  const codiceFiscale = pickFlat(
+    flat,
+    "COD_FISCALE",
+    "Z_CODICE_FISCALE",
+    "CODICE_FISCALE",
+    "EXT_COD_FISCALE",
+    "EXT_CODFISCALE",
+    "COD_FISC",
+    "CF",
+    "CODICEFISCALE"
+  );
+  // P.IVA cliente: preferisci PIVA / PARTITA_IVA (non PIVA_MITT/DEST/DISTR)
+  const partitaIva = pickFlat(
+    flat,
+    "Z_PARTITA_IVA",
+    "PARTITA_IVA",
+    "PIVA",
+    "EXT_PARTITA_IVA",
+    "PARTITAIVA",
+    "P_IVA",
+    "P.IVA"
+  );
 
   return {
     requestCode: code,
@@ -147,32 +186,14 @@ function buildCommonValuesFromDb(dbResult, requestCodeFallback) {
       "EXT_RAGSOC",
       "RAGIONE_SOCIALE"
     ),
-    zCodiceFiscale: pickFlat(
-      flat,
-      "Z_CODICE_FISCALE",
-      "CODICE_FISCALE",
-      "EXT_COD_FISCALE",
-      "EXT_COD_FISCALE",
-      "CF"
-    ),
-    zPartitaIva: pickFlat(
-      flat,
-      "Z_PARTITA_IVA",
-      "PARTITA_IVA",
-      "PIVA",
-      "EXT_PARTITA_IVA"
-    ),
+    zCodiceFiscale: codiceFiscale,
+    zPartitaIva: partitaIva,
     zTel: pickFlat(flat, "Z_TEL", "TEL", "TELEFONO", "CELLULARE"),
     extNome: pickFlat(flat, "EXT_NOME", "NOME", "Z_NOME"),
     extCognome: pickFlat(flat, "EXT_COGNOME", "COGNOME", "Z_COGNOME"),
     extRagsoc: pickFlat(flat, "EXT_RAGSOC", "RAGSOC", "Z_RAGSOC"),
-    extCodFiscale: pickFlat(
-      flat,
-      "EXT_COD_FISCALE",
-      "CODICE_FISCALE",
-      "Z_CODICE_FISCALE",
-      "CF"
-    ),
+    extCodFiscale: codiceFiscale,
+    extPartitaIva: partitaIva,
     extSernr: pickFlat(
       flat,
       "EXT_SERNR",
@@ -265,12 +286,14 @@ function setDbJsonBox(textareaEl, dbResult) {
 
 /**
  * Legge il codice richiesta dal tab (DOCUMENTKEY) e carica amc.request.
- * Ritorna { code, db, values } oppure lancia Error.
+ * Unisce i valori: priorità al DB, fallback sull'interfaccia (scrape).
+ * Ritorna { code, db, values, scraped } oppure lancia Error.
  */
 async function loadRequestContextForFlow() {
   let code = "";
+  let scraped = null;
   try {
-    const scraped = await scrapeFromActiveTab();
+    scraped = await scrapeFromActiveTab();
     code = (scraped.documentkey || "").trim();
   } catch (e) {
     /* tab non accessibile: code resta vuoto */
@@ -285,5 +308,46 @@ async function loadRequestContextForFlow() {
     throw new Error(db.error || "Impossibile leggere amc.request.");
   }
   const values = buildCommonValuesFromDb(db, code);
-  return { code, db, values, scraped: null };
+
+  // Completa i buchi con i campi letti dalla schermata (CF, P.IVA, Codice Pratica SII, …)
+  if (scraped) {
+    const s = scraped;
+    values.documentkey = firstFilled(values.documentkey, s.documentkey);
+    values.pod = firstFilled(values.pod, s.pod);
+    values.codPdr = firstFilled(values.codPdr, s.pod);
+    values.rif_ext = firstFilled(values.rif_ext, s.rif_ext);
+    values.extNome = firstFilled(values.extNome, s.extNome);
+    values.extCognome = firstFilled(values.extCognome, s.extCognome);
+    values.extRagsoc = firstFilled(values.extRagsoc, s.extRagsoc);
+    values.zNome = firstFilled(values.zNome, s.extNome, s.zNome);
+    values.zCognome = firstFilled(values.zCognome, s.extCognome, s.zCognome);
+    values.zRagsoc = firstFilled(values.zRagsoc, s.extRagsoc, s.zRagsoc);
+    values.extCodFiscale = firstFilled(
+      values.extCodFiscale,
+      s.extCodFiscale,
+      s.zCodiceFiscale
+    );
+    values.zCodiceFiscale = firstFilled(
+      values.zCodiceFiscale,
+      s.extCodFiscale,
+      s.zCodiceFiscale
+    );
+    values.extPartitaIva = firstFilled(
+      values.extPartitaIva,
+      s.extPartitaIva,
+      s.zPartitaIva
+    );
+    values.zPartitaIva = firstFilled(
+      values.zPartitaIva,
+      s.zPartitaIva,
+      s.extPartitaIva
+    );
+    values.venditoreCodice = firstFilled(
+      values.venditoreCodice,
+      s.venditoreCodice
+    );
+    values.extDtDecorD = firstFilled(values.extDtDecorD, s.extDtDecorD);
+  }
+
+  return { code, db, values, scraped };
 }

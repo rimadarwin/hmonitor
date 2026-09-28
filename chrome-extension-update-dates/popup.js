@@ -1,6 +1,9 @@
 /**
  * @author Maurizio di Sabato <maurizio.disabato@xcconsulting.it>
  * @description Popup/side panel: date, switch ATOA/FILE, flussi Heroku con populate da amc.request
+ * @modified 28.09.2026 - MDS | Sync automatico input → corpo JSON su tutti i flussi
+ * @modified 28.09.2026 - MDS | Flussi ELE ES1 100 e ELE ES1 150 (inboundflow, struttura righe)
+ * @modified 28.09.2026 - MDS | Scrape CF/P.IVA/Codice Pratica SII con alias etichette UI
  * @modified 24.09.2026 - MDS | Schermata Mockup CP1 (load/update simulatore_risposta_campi)
  * @modified 23.09.2026 - MDS | Schermata Riporta in sospeso (POST /riporta-sospeso)
  * @modified 23.09.2026 - MDS | Populate flussi da amc.request (id_request + input) invece dello scrape
@@ -190,6 +193,76 @@ async function loadDefaultWp1Payload() {
   const res = await fetch(chrome.runtime.getURL("wp1-default-payload.json"));
   if (!res.ok) throw new Error("Impossibile caricare il template WP1 JSON.");
   return res.json();
+}
+
+
+/** Campi prestazione: supporta sia requests[] sia righe[] (ES1). */
+function getPrestazioneFieldsArray(payload) {
+  const p = payload?.prestazione;
+  if (!p) return null;
+  if (Array.isArray(p.requests?.[0]?.fields)) return p.requests[0].fields;
+  if (Array.isArray(p.righe?.[0]?.fields)) return p.righe[0].fields;
+  return null;
+}
+
+function setFieldsFromMap(fields, map) {
+  if (!Array.isArray(fields)) return;
+  for (const row of fields) {
+    if (Object.prototype.hasOwnProperty.call(map, row.field)) {
+      const v = map[row.field];
+      row.value = v == null ? "" : String(v);
+    }
+  }
+}
+
+async function loadDefaultEleEs1100Payload() {
+  const res = await fetch(chrome.runtime.getURL("ele-es1-100-default-payload.json"));
+  if (!res.ok) throw new Error("Impossibile caricare il template ELE ES1 100 JSON.");
+  return res.json();
+}
+
+async function loadDefaultEleEs1150Payload() {
+  const res = await fetch(chrome.runtime.getURL("ele-es1-150-default-payload.json"));
+  if (!res.ok) throw new Error("Impossibile caricare il template ELE ES1 150 JSON.");
+  return res.json();
+}
+
+function applyEleEs1100FieldsToPayload(payload, values) {
+  const p = typeof payload === "string" ? JSON.parse(payload) : payload;
+  const fields = getPrestazioneFieldsArray(p);
+  setFieldsFromMap(fields, {
+    DOCUMENTKEY: values.documentkey,
+    RIF_EXT: values.rif_ext,
+    DES_ESITO_VERIFICA_AMM: values.desEsitoVerificaAmm || "1",
+    CODERR_AEEG: values.coderrAeeg || "",
+    EXT_ANNOTAZIONI: values.extAnnotazioni || "",
+  });
+  return p;
+}
+
+function applyEleEs1150FieldsToPayload(payload, values) {
+  const p = typeof payload === "string" ? JSON.parse(payload) : payload;
+  const fields = getPrestazioneFieldsArray(p);
+  setFieldsFromMap(fields, {
+    DOCUMENTKEY: values.documentkey,
+    RIF_EXT: values.rif_ext,
+    COD_CONTR_DISP: values.codContrDisp || "",
+    EXT_STATO_RICHIESTA: "1",
+    EXT_DT_DECOR_D: toDDMMYYYYForAv1(values.extDtDecorD),
+    EXT_POD: values.pod || "",
+    COGNOME: values.extCognome || values.zCognome || "",
+    NOME: values.extNome || values.zNome || "",
+    RAGIONE_SOCIALE: values.extRagsoc || values.zRagsoc || "",
+    COD_FISCALE: values.extCodFiscale || values.zCodiceFiscale || "",
+    PIVA: values.extPartitaIva || values.zPartitaIva || "",
+    EXT_POT_IMP: values.extPotImp || "3",
+    EXT_POT_DISP: values.extPotDisp || "3.3",
+    EXT_TENS_ALIM: values.extTensAlim || "120",
+    EXT_OPZ_TARIFFA: values.extOpzTariffa || "ETAA1M00F1",
+    EXT_TIPO_MISURATORE: values.extTipoMisuratore || "CE",
+    EXT_ANNOTAZIONI: values.extAnnotazioni || "",
+  });
+  return p;
 }
 
 async function loadDefaultEleAv1Payload() {
@@ -960,6 +1033,15 @@ function scrapeRichiestaPage() {
     );
   }
 
+  /** Prova più etichette UI (prima non vuota). */
+  function getFieldAny(...labels) {
+    for (const lab of labels) {
+      const v = getField(lab);
+      if (v) return v;
+    }
+    return "";
+  }
+
   function extractDocumentKeyFromRoot(root) {
     let header;
     try {
@@ -1014,17 +1096,52 @@ function scrapeRichiestaPage() {
 
   return {
     documentkey,
-    pod: getField("POD"),
-    rif_ext: getField("Codice Pratica SII"),
-    extNome: getField("Nome"),
-    extCognome: getField("Cognome"),
-    extRagsoc: getField("Ragione Sociale"),
-    extCodFiscale: getField("Codice Fiscale"),
-    venditoreCodice: parseVenditoreCodice(getField("Venditore")),
+    pod: getFieldAny("POD", "PDR", "Codice POD", "Codice PDR"),
+    // RIF_EXT ← Codice Pratica SII (etichette tipiche in dettaglio richiesta)
+    rif_ext: getFieldAny(
+      "Codice Pratica SII",
+      "Codice pratica SII",
+      "Codice Pratica Sii",
+      "Pratica SII",
+      "RIF_EXT",
+      "Rif Ext"
+    ),
+    extNome: getFieldAny("Nome"),
+    extCognome: getFieldAny("Cognome"),
+    extRagsoc: getFieldAny("Ragione Sociale", "Ragione sociale"),
+    extCodFiscale: getFieldAny(
+      "Codice Fiscale",
+      "Codice fiscale",
+      "CF",
+      "C.F."
+    ),
+    zCodiceFiscale: getFieldAny(
+      "Codice Fiscale",
+      "Codice fiscale",
+      "CF",
+      "C.F."
+    ),
+    extPartitaIva: getFieldAny(
+      "Partita IVA",
+      "Partita Iva",
+      "Partita iva",
+      "P.IVA",
+      "P.IVA.",
+      "PIVA",
+      "P IVA"
+    ),
+    zPartitaIva: getFieldAny(
+      "Partita IVA",
+      "Partita Iva",
+      "Partita iva",
+      "P.IVA",
+      "P.IVA.",
+      "PIVA",
+      "P IVA"
+    ),
+    venditoreCodice: parseVenditoreCodice(getFieldAny("Venditore")),
     extDtDecorD: firstNonEmpty(
-      getField("Data decorrenza"),
-      getField("Decorrenza"),
-      getField("EXT_DT_DECOR_D")
+      getFieldAny("Data decorrenza", "Decorrenza", "EXT_DT_DECOR_D")
     ),
   };
 }
@@ -1059,6 +1176,9 @@ async function scrapeFromActiveTab() {
       "extCognome",
       "extRagsoc",
       "extCodFiscale",
+      "zCodiceFiscale",
+      "extPartitaIva",
+      "zPartitaIva",
       "venditoreCodice",
       "extDtDecorD",
     ];
@@ -1110,7 +1230,10 @@ async function scrapeFromActiveTab() {
     extNome: t(raw.extNome),
     extCognome: t(raw.extCognome),
     extRagsoc: t(raw.extRagsoc),
-    extCodFiscale: t(raw.extCodFiscale),
+    extCodFiscale: t(raw.extCodFiscale) || t(raw.zCodiceFiscale),
+    zCodiceFiscale: t(raw.zCodiceFiscale) || t(raw.extCodFiscale),
+    extPartitaIva: t(raw.extPartitaIva) || t(raw.zPartitaIva),
+    zPartitaIva: t(raw.zPartitaIva) || t(raw.extPartitaIva),
     venditoreCodice: t(raw.venditoreCodice),
     extDtDecorD: normalizeDateToYYYYMMDD(t(raw.extDtDecorD)),
   };
@@ -1163,6 +1286,8 @@ function showScreen(name) {
   const mockupCp1 = document.getElementById("screenMockupCp1");
   const vt1 = document.getElementById("screenVt1");
   const eleAv1 = document.getElementById("screenEleAv1");
+  const eleEs1100 = document.getElementById("screenEleEs1100");
+  const eleEs1150 = document.getElementById("screenEleEs1150");
   const wp1 = document.getElementById("screenWp1");
   const gasA01 = document.getElementById("screenGasA01");
   const gasA01150 = document.getElementById("screenGasA01150");
@@ -1177,6 +1302,8 @@ function showScreen(name) {
   if (sospeso) sospeso.classList.toggle("hidden", name !== "sospeso");
   if (mockupCp1) mockupCp1.classList.toggle("hidden", name !== "mockupCp1");
   if (eleAv1) eleAv1.classList.toggle("hidden", name !== "eleAv1");
+  if (eleEs1100) eleEs1100.classList.toggle("hidden", name !== "eleEs1100");
+  if (eleEs1150) eleEs1150.classList.toggle("hidden", name !== "eleEs1150");
   vt1.classList.toggle("hidden", name !== "vt1");
   if (wp1) wp1.classList.toggle("hidden", name !== "wp1");
   if (gasA01) gasA01.classList.toggle("hidden", name !== "gasA01");
@@ -1211,6 +1338,8 @@ document.addEventListener("DOMContentLoaded", () => {
   const goSospeso = document.getElementById("goSospeso");
   const goMockupCp1 = document.getElementById("goMockupCp1");
   const goEleAv1 = document.getElementById("goEleAv1");
+  const goEleEs1100 = document.getElementById("goEleEs1100");
+  const goEleEs1150 = document.getElementById("goEleEs1150");
   const goVt1 = document.getElementById("goVt1");
   const goWp1 = document.getElementById("goWp1");
   const goGasA01 = document.getElementById("goGasA01");
@@ -1285,6 +1414,47 @@ document.addEventListener("DOMContentLoaded", () => {
   const statusEleAv1 = document.getElementById("statusEleAv1");
   const logEleAv1 = document.getElementById("logEleAv1");
   const backFromEleAv1 = document.getElementById("backFromEleAv1");
+
+  const scrapeAgainEleEs1100 = document.getElementById("scrapeAgainEleEs1100");
+  const eleEs1100Documentkey = document.getElementById("eleEs1100Documentkey");
+  const eleEs1100RifExt = document.getElementById("eleEs1100RifExt");
+  const eleEs1100DesEsito = document.getElementById("eleEs1100DesEsito");
+  const eleEs1100Coderr = document.getElementById("eleEs1100Coderr");
+  const eleEs1100Annotazioni = document.getElementById("eleEs1100Annotazioni");
+  const eleEs1100Cookie = document.getElementById("eleEs1100Cookie");
+  const eleEs1100DbJson = document.getElementById("eleEs1100DbJson");
+  const eleEs1100Json = document.getElementById("eleEs1100Json");
+  const eleEs1100ApplyFields = document.getElementById("eleEs1100ApplyFields");
+  const eleEs1100Send = document.getElementById("eleEs1100Send");
+  const statusEleEs1100 = document.getElementById("statusEleEs1100");
+  const logEleEs1100 = document.getElementById("logEleEs1100");
+  const backFromEleEs1100 = document.getElementById("backFromEleEs1100");
+
+  const scrapeAgainEleEs1150 = document.getElementById("scrapeAgainEleEs1150");
+  const eleEs1150Documentkey = document.getElementById("eleEs1150Documentkey");
+  const eleEs1150RifExt = document.getElementById("eleEs1150RifExt");
+  const eleEs1150Pod = document.getElementById("eleEs1150Pod");
+  const eleEs1150ExtDtDecor = document.getElementById("eleEs1150ExtDtDecor");
+  const eleEs1150CodContrDisp = document.getElementById("eleEs1150CodContrDisp");
+  const eleEs1150Nome = document.getElementById("eleEs1150Nome");
+  const eleEs1150Cognome = document.getElementById("eleEs1150Cognome");
+  const eleEs1150Ragsoc = document.getElementById("eleEs1150Ragsoc");
+  const eleEs1150Cf = document.getElementById("eleEs1150Cf");
+  const eleEs1150Piva = document.getElementById("eleEs1150Piva");
+  const eleEs1150PotImp = document.getElementById("eleEs1150PotImp");
+  const eleEs1150PotDisp = document.getElementById("eleEs1150PotDisp");
+  const eleEs1150TensAlim = document.getElementById("eleEs1150TensAlim");
+  const eleEs1150OpzTariffa = document.getElementById("eleEs1150OpzTariffa");
+  const eleEs1150TipoMis = document.getElementById("eleEs1150TipoMis");
+  const eleEs1150Cookie = document.getElementById("eleEs1150Cookie");
+  const eleEs1150DbJson = document.getElementById("eleEs1150DbJson");
+  const eleEs1150Json = document.getElementById("eleEs1150Json");
+  const eleEs1150ApplyFields = document.getElementById("eleEs1150ApplyFields");
+  const eleEs1150Send = document.getElementById("eleEs1150Send");
+  const statusEleEs1150 = document.getElementById("statusEleEs1150");
+  const logEleEs1150 = document.getElementById("logEleEs1150");
+  const backFromEleEs1150 = document.getElementById("backFromEleEs1150");
+
 
   const scrapeAgainWp1 = document.getElementById("scrapeAgainWp1");
   const wp1Documentkey = document.getElementById("wp1Documentkey");
@@ -1436,6 +1606,10 @@ document.addEventListener("DOMContentLoaded", () => {
     document.getElementById("openOptionsVt1Auth"),
     document.getElementById("openOptionsEleAv1"),
     document.getElementById("openOptionsEleAv1Auth"),
+    document.getElementById("openOptionsEleEs1100"),
+    document.getElementById("openOptionsEleEs1100Auth"),
+    document.getElementById("openOptionsEleEs1150"),
+    document.getElementById("openOptionsEleEs1150Auth"),
     document.getElementById("openOptionsWp1"),
     document.getElementById("openOptionsWp1Auth"),
     document.getElementById("openOptionsGasA01"),
@@ -1502,6 +1676,65 @@ document.addEventListener("DOMContentLoaded", () => {
     eleAv1OpzTariffa.value = top.extOpzTariffa || "TD";
     eleAv1TensFase.value = top.extTensFase || "BT_MONOFASE";
   }
+
+  function collectEleEs1100FormValues() {
+    return {
+      documentkey: eleEs1100Documentkey.value.trim(),
+      rif_ext: eleEs1100RifExt.value.trim(),
+      desEsitoVerificaAmm: eleEs1100DesEsito.value.trim() || "1",
+      coderrAeeg: eleEs1100Coderr.value.trim(),
+      extAnnotazioni: eleEs1100Annotazioni.value.trim(),
+    };
+  }
+
+  function fillEleEs1100InputsFromTop(top) {
+    eleEs1100Documentkey.value = top.documentkey || "";
+    eleEs1100RifExt.value = top.rif_ext || "";
+    eleEs1100DesEsito.value = top.desEsitoVerificaAmm || "1";
+    eleEs1100Coderr.value = top.coderrAeeg || "";
+    eleEs1100Annotazioni.value = top.extAnnotazioni || "";
+  }
+
+  function collectEleEs1150FormValues() {
+    return {
+      documentkey: eleEs1150Documentkey.value.trim(),
+      rif_ext: eleEs1150RifExt.value.trim(),
+      pod: eleEs1150Pod.value.trim(),
+      extDtDecorD: eleEs1150ExtDtDecor.value.trim() || todayDDMMYYYY(),
+      codContrDisp: eleEs1150CodContrDisp.value.trim(),
+      extNome: eleEs1150Nome.value.trim(),
+      extCognome: eleEs1150Cognome.value.trim(),
+      extRagsoc: eleEs1150Ragsoc.value.trim(),
+      extCodFiscale: eleEs1150Cf.value.trim(),
+      extPartitaIva: eleEs1150Piva.value.trim(),
+      zCodiceFiscale: eleEs1150Cf.value.trim(),
+      zPartitaIva: eleEs1150Piva.value.trim(),
+      extPotImp: eleEs1150PotImp.value.trim() || "3",
+      extPotDisp: eleEs1150PotDisp.value.trim() || "3.3",
+      extTensAlim: eleEs1150TensAlim.value.trim() || "120",
+      extOpzTariffa: eleEs1150OpzTariffa.value.trim() || "ETAA1M00F1",
+      extTipoMisuratore: eleEs1150TipoMis.value.trim() || "CE",
+    };
+  }
+
+  function fillEleEs1150InputsFromTop(top) {
+    eleEs1150Documentkey.value = top.documentkey || "";
+    eleEs1150RifExt.value = top.rif_ext || "";
+    eleEs1150Pod.value = top.pod || "";
+    eleEs1150ExtDtDecor.value = top.extDtDecorD || todayDDMMYYYY();
+    eleEs1150CodContrDisp.value = top.codContrDisp || "";
+    eleEs1150Nome.value = top.extNome || top.zNome || "";
+    eleEs1150Cognome.value = top.extCognome || top.zCognome || "";
+    eleEs1150Ragsoc.value = top.extRagsoc || top.zRagsoc || "";
+    eleEs1150Cf.value = top.extCodFiscale || top.zCodiceFiscale || "";
+    eleEs1150Piva.value = top.extPartitaIva || top.zPartitaIva || "";
+    eleEs1150PotImp.value = top.extPotImp || "3";
+    eleEs1150PotDisp.value = top.extPotDisp || "3.3";
+    eleEs1150TensAlim.value = top.extTensAlim || "120";
+    eleEs1150OpzTariffa.value = top.extOpzTariffa || "ETAA1M00F1";
+    eleEs1150TipoMis.value = top.extTipoMisuratore || "CE";
+  }
+
 
   function collectWp1FormValues() {
     return {
@@ -1746,6 +1979,22 @@ document.addEventListener("DOMContentLoaded", () => {
     await populateEleAv1Screen(true);
   });
 
+  goEleEs1100.addEventListener("click", async () => {
+    showScreen("eleEs1100");
+    logEleEs1100.classList.add("hidden");
+    logEleEs1100.textContent = "";
+    setStatus(statusEleEs1100, "Caricamento…", "");
+    await populateEleEs1100Screen(true);
+  });
+
+  goEleEs1150.addEventListener("click", async () => {
+    showScreen("eleEs1150");
+    logEleEs1150.classList.add("hidden");
+    logEleEs1150.textContent = "";
+    setStatus(statusEleEs1150, "Caricamento…", "");
+    await populateEleEs1150Screen(true);
+  });
+
   goWp1.addEventListener("click", async () => {
     showScreen("wp1");
     logWp1.classList.add("hidden");
@@ -1816,6 +2065,8 @@ document.addEventListener("DOMContentLoaded", () => {
   backFromMockupCp1.addEventListener("click", () => showScreen("home"));
   backFromVt1.addEventListener("click", () => showScreen("home"));
   backFromEleAv1.addEventListener("click", () => showScreen("home"));
+  backFromEleEs1100.addEventListener("click", () => showScreen("home"));
+  backFromEleEs1150.addEventListener("click", () => showScreen("home"));
   backFromWp1.addEventListener("click", () => showScreen("home"));
   backFromGasA01.addEventListener("click", () => showScreen("home"));
   backFromGasA01150.addEventListener("click", () => showScreen("home"));
@@ -2163,6 +2414,77 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
+  async function populateEleEs1100Screen(_doScrape) {
+    try {
+      setStatus(statusEleEs1100, "Carico dati da amc.request…", "");
+      const basePayload = await loadDefaultEleEs1100Payload();
+      const payload = deepClone(basePayload);
+      const ctx = await loadRequestContextForFlow();
+      setDbJsonBox(eleEs1100DbJson, ctx.db);
+      const v = ctx.values;
+      fillEleEs1100InputsFromTop({
+        documentkey: v.documentkey,
+        rif_ext: v.rif_ext,
+        desEsitoVerificaAmm: "1",
+        coderrAeeg: "",
+        extAnnotazioni: "",
+      });
+      applyEleEs1100FieldsToPayload(payload, collectEleEs1100FormValues());
+      const sec = await getVt1LocalForAuth();
+      eleEs1100Cookie.value = sec.vt1Cookie || "";
+      eleEs1100Json.value = JSON.stringify(payload, null, 2);
+      setStatus(
+        statusEleEs1100,
+        `Dati da DB · id_request=${v.id_request ?? "—"} · ${v.requestCode}`,
+        "ok"
+      );
+    } catch (e) {
+      setDbJsonBox(eleEs1100DbJson, { ok: false, error: String(e.message || e) });
+      setStatus(statusEleEs1100, String(e.message || e), "err");
+    }
+  }
+
+  async function populateEleEs1150Screen(_doScrape) {
+    try {
+      setStatus(statusEleEs1150, "Carico dati da amc.request…", "");
+      const basePayload = await loadDefaultEleEs1150Payload();
+      const payload = deepClone(basePayload);
+      const ctx = await loadRequestContextForFlow();
+      setDbJsonBox(eleEs1150DbJson, ctx.db);
+      const v = ctx.values;
+      fillEleEs1150InputsFromTop({
+        documentkey: v.documentkey,
+        rif_ext: v.rif_ext,
+        pod: v.pod,
+        extDtDecorD: toDDMMYYYYForAv1(v.extDtDecorD) || todayDDMMYYYY(),
+        codContrDisp: v.codContrDisp || "",
+        extNome: v.extNome || v.zNome,
+        extCognome: v.extCognome || v.zCognome,
+        extRagsoc: v.extRagsoc || v.zRagsoc,
+        extCodFiscale: v.extCodFiscale || v.zCodiceFiscale,
+        extPartitaIva: v.extPartitaIva || v.zPartitaIva,
+        extPotImp: v.extPotImp || "3",
+        extPotDisp: v.extPotDisp || "3.3",
+        extTensAlim: v.extTensAlim || "120",
+        extOpzTariffa: v.extOpzTariffa || "ETAA1M00F1",
+        extTipoMisuratore: "CE",
+      });
+      applyEleEs1150FieldsToPayload(payload, collectEleEs1150FormValues());
+      const sec = await getVt1LocalForAuth();
+      eleEs1150Cookie.value = sec.vt1Cookie || "";
+      eleEs1150Json.value = JSON.stringify(payload, null, 2);
+      setStatus(
+        statusEleEs1150,
+        `Dati da DB · id_request=${v.id_request ?? "—"} · ${v.requestCode}`,
+        "ok"
+      );
+    } catch (e) {
+      setDbJsonBox(eleEs1150DbJson, { ok: false, error: String(e.message || e) });
+      setStatus(statusEleEs1150, String(e.message || e), "err");
+    }
+  }
+
+
   async function populateWp1Screen(_doScrape) {
     try {
       setStatus(statusWp1, "Carico dati da amc.request…", "");
@@ -2290,6 +2612,143 @@ document.addEventListener("DOMContentLoaded", () => {
       setStatus(statusEleAv1, String(e.message || e), "err");
     } finally {
       eleAv1Send.disabled = false;
+    }
+  });
+
+
+  scrapeAgainEleEs1100.addEventListener("click", async () => {
+    scrapeAgainEleEs1100.disabled = true;
+    await populateEleEs1100Screen(true);
+    scrapeAgainEleEs1100.disabled = false;
+  });
+
+
+  eleEs1100Send.addEventListener("click", async () => {
+    logEleEs1100.classList.add("hidden");
+    logEleEs1100.textContent = "";
+    const authLocal = await getVt1LocalForAuth();
+    const authBuilt = buildVt1AuthorizationHeader(authLocal);
+    if (!authBuilt.ok) {
+      setStatus(statusEleEs1100, authBuilt.message, "err");
+      return;
+    }
+    let bodyObj;
+    try {
+      bodyObj = JSON.parse(eleEs1100Json.value);
+    } catch (e) {
+      setStatus(statusEleEs1100, `JSON non valido: ${e.message}`, "err");
+      return;
+    }
+    applyEleEs1100FieldsToPayload(bodyObj, collectEleEs1100FormValues());
+    const bodyStr = JSON.stringify(bodyObj);
+    eleEs1100Json.value = JSON.stringify(bodyObj, null, 2);
+    eleEs1100Send.disabled = true;
+    setStatus(statusEleEs1100, "Invio in corso…", "");
+    try {
+      const endpoint = await getVt1Url();
+      console.debug("[ELE ES1 100] POST", endpoint);
+      const headers = {
+        "Content-Type": "application/json",
+        Authorization: authBuilt.value,
+      };
+      const cookie = eleEs1100Cookie.value.trim();
+      if (cookie) headers.Cookie = cookie;
+      const res = await fetch(endpoint, {
+        method: "POST",
+        headers,
+        body: bodyStr,
+      });
+      const textRes = await res.text();
+      let pretty = textRes;
+      try {
+        pretty = JSON.stringify(JSON.parse(textRes), null, 2);
+      } catch {
+        /* testo puro */
+      }
+      if (!res.ok) {
+        setStatus(statusEleEs1100, `HTTP ${res.status}`, "err");
+        logEleEs1100.textContent = pretty;
+        logEleEs1100.classList.remove("hidden");
+        return;
+      }
+      setStatus(statusEleEs1100, `OK · HTTP ${res.status}`, "ok");
+      if (pretty) {
+        logEleEs1100.textContent = pretty;
+        logEleEs1100.classList.remove("hidden");
+      }
+      await chrome.storage.local.set({ vt1Cookie: cookie });
+    } catch (e) {
+      setStatus(statusEleEs1100, String(e.message || e), "err");
+    } finally {
+      eleEs1100Send.disabled = false;
+    }
+  });
+
+  scrapeAgainEleEs1150.addEventListener("click", async () => {
+    scrapeAgainEleEs1150.disabled = true;
+    await populateEleEs1150Screen(true);
+    scrapeAgainEleEs1150.disabled = false;
+  });
+
+
+  eleEs1150Send.addEventListener("click", async () => {
+    logEleEs1150.classList.add("hidden");
+    logEleEs1150.textContent = "";
+    const authLocal = await getVt1LocalForAuth();
+    const authBuilt = buildVt1AuthorizationHeader(authLocal);
+    if (!authBuilt.ok) {
+      setStatus(statusEleEs1150, authBuilt.message, "err");
+      return;
+    }
+    let bodyObj;
+    try {
+      bodyObj = JSON.parse(eleEs1150Json.value);
+    } catch (e) {
+      setStatus(statusEleEs1150, `JSON non valido: ${e.message}`, "err");
+      return;
+    }
+    applyEleEs1150FieldsToPayload(bodyObj, collectEleEs1150FormValues());
+    const bodyStr = JSON.stringify(bodyObj);
+    eleEs1150Json.value = JSON.stringify(bodyObj, null, 2);
+    eleEs1150Send.disabled = true;
+    setStatus(statusEleEs1150, "Invio in corso…", "");
+    try {
+      const endpoint = await getVt1Url();
+      console.debug("[ELE ES1 150] POST", endpoint);
+      const headers = {
+        "Content-Type": "application/json",
+        Authorization: authBuilt.value,
+      };
+      const cookie = eleEs1150Cookie.value.trim();
+      if (cookie) headers.Cookie = cookie;
+      const res = await fetch(endpoint, {
+        method: "POST",
+        headers,
+        body: bodyStr,
+      });
+      const textRes = await res.text();
+      let pretty = textRes;
+      try {
+        pretty = JSON.stringify(JSON.parse(textRes), null, 2);
+      } catch {
+        /* testo puro */
+      }
+      if (!res.ok) {
+        setStatus(statusEleEs1150, `HTTP ${res.status}`, "err");
+        logEleEs1150.textContent = pretty;
+        logEleEs1150.classList.remove("hidden");
+        return;
+      }
+      setStatus(statusEleEs1150, `OK · HTTP ${res.status}`, "ok");
+      if (pretty) {
+        logEleEs1150.textContent = pretty;
+        logEleEs1150.classList.remove("hidden");
+      }
+      await chrome.storage.local.set({ vt1Cookie: cookie });
+    } catch (e) {
+      setStatus(statusEleEs1150, String(e.message || e), "err");
+    } finally {
+      eleEs1150Send.disabled = false;
     }
   });
 
@@ -2473,17 +2932,6 @@ document.addEventListener("DOMContentLoaded", () => {
     scrapeAgainGasA01.disabled = false;
   });
 
-  gasA01ApplyFields.addEventListener("click", () => {
-    try {
-      const payload = JSON.parse(gasA01Json.value);
-      applyGasA01FieldsToPayload(payload, collectGasA01FormValues());
-      applyVenditoreToPayload(payload, gasA01VenditoreCache);
-      gasA01Json.value = JSON.stringify(payload, null, 2);
-      setStatus(statusGasA01, "JSON aggiornato dai campi.", "ok");
-    } catch (e) {
-      setStatus(statusGasA01, `JSON non valido: ${e.message}`, "err");
-    }
-  });
 
   gasA01Send.addEventListener("click", async () => {
     logGasA01.classList.add("hidden");
@@ -2595,17 +3043,6 @@ document.addEventListener("DOMContentLoaded", () => {
     scrapeAgainGasA01150.disabled = false;
   });
 
-  gasA01150ApplyFields.addEventListener("click", () => {
-    try {
-      const payload = JSON.parse(gasA01150Json.value);
-      applyGasA01150FieldsToPayload(payload, collectGasA01150FormValues());
-      applyVenditoreToPayload(payload, gasA01150VenditoreCache);
-      gasA01150Json.value = JSON.stringify(payload, null, 2);
-      setStatus(statusGasA01150, "JSON aggiornato dai campi.", "ok");
-    } catch (e) {
-      setStatus(statusGasA01150, `JSON non valido: ${e.message}`, "err");
-    }
-  });
 
   gasA01150Send.addEventListener("click", async () => {
     logGasA01150.classList.add("hidden");
@@ -2723,17 +3160,6 @@ document.addEventListener("DOMContentLoaded", () => {
     scrapeAgainSg1.disabled = false;
   });
 
-  sg1ApplyFields.addEventListener("click", () => {
-    try {
-      const payload = JSON.parse(sg1Json.value);
-      applySg1FieldsToPayload(payload, collectSg1FormValues());
-      applyVenditoreToPayload(payload, sg1VenditoreCache);
-      sg1Json.value = JSON.stringify(payload, null, 2);
-      setStatus(statusSg1, "JSON aggiornato dai campi.", "ok");
-    } catch (e) {
-      setStatus(statusSg1, `JSON non valido: ${e.message}`, "err");
-    }
-  });
 
   sg1Send.addEventListener("click", async () => {
     logSg1.classList.add("hidden");
@@ -2845,16 +3271,6 @@ document.addEventListener("DOMContentLoaded", () => {
     scrapeAgainSg1Dtms.disabled = false;
   });
 
-  sg1DtmsApplyFields.addEventListener("click", () => {
-    try {
-      const payload = JSON.parse(sg1DtmsJson.value);
-      const next = applySg1DtmsFieldsToPayload(payload, collectSg1DtmsFormValues());
-      sg1DtmsJson.value = JSON.stringify(next, null, 2);
-      setStatus(statusSg1Dtms, "JSON aggiornato (date = oggi).", "ok");
-    } catch (e) {
-      setStatus(statusSg1Dtms, `JSON non valido: ${e.message}`, "err");
-    }
-  });
 
   sg1DtmsSend.addEventListener("click", async () => {
     logSg1Dtms.classList.add("hidden");
@@ -2979,19 +3395,6 @@ document.addEventListener("DOMContentLoaded", () => {
     scrapeAgainGasA01Dtec.disabled = false;
   });
 
-  gasA01DtecApplyFields.addEventListener("click", () => {
-    try {
-      const payload = JSON.parse(gasA01DtecJson.value);
-      const next = applyGasA01DtecFieldsToPayload(
-        payload,
-        collectGasA01DtecFormValues()
-      );
-      gasA01DtecJson.value = JSON.stringify(next, null, 2);
-      setStatus(statusGasA01Dtec, "JSON aggiornato dai campi.", "ok");
-    } catch (e) {
-      setStatus(statusGasA01Dtec, `JSON non valido: ${e.message}`, "err");
-    }
-  });
 
   gasA01DtecSend.addEventListener("click", async () => {
     logGasA01Dtec.classList.add("hidden");
@@ -3110,16 +3513,6 @@ document.addEventListener("DOMContentLoaded", () => {
     scrapeAgainSe1Dtec.disabled = false;
   });
 
-  se1DtecApplyFields.addEventListener("click", () => {
-    try {
-      const payload = JSON.parse(se1DtecJson.value);
-      const next = applySe1DtecFieldsToPayload(payload, collectSe1DtecFormValues());
-      se1DtecJson.value = JSON.stringify(next, null, 2);
-      setStatus(statusSe1Dtec, "JSON aggiornato (EXT_DT_DECOR_D = oggi).", "ok");
-    } catch (e) {
-      setStatus(statusSe1Dtec, `JSON non valido: ${e.message}`, "err");
-    }
-  });
 
   se1DtecSend.addEventListener("click", async () => {
     logSe1Dtec.classList.add("hidden");
@@ -3225,15 +3618,6 @@ document.addEventListener("DOMContentLoaded", () => {
     setStatus(statusBatchApn, `runId aggiornato: ${payload.runId}`, "ok");
   });
 
-  batchApnApplyFields.addEventListener("click", () => {
-    const payload = buildBatchApnPayload({
-      runId: batchApnRunId.value.trim(),
-      batchType: batchApnBatchType.value.trim() || "MS_083",
-      dlSiiVariantCode: batchApnVariant.value,
-    });
-    syncBatchApnFormFromPayload(payload);
-    setStatus(statusBatchApn, "JSON aggiornato dai campi.", "ok");
-  });
 
   batchApnSend.addEventListener("click", async () => {
     logBatchApn.classList.add("hidden");
@@ -3318,5 +3702,262 @@ document.addEventListener("DOMContentLoaded", () => {
     } finally {
       batchApnSend.disabled = false;
     }
+  });
+
+  /**
+   * Aggiorna il textarea JSON quando si modificano gli input della schermata.
+   * Esclude cookie, DbJson e il textarea JSON stesso.
+   * In digitazione: sync silenzioso; sul pulsante Apply: sync + messaggio.
+   */
+  function wireLiveJsonSync({
+    screenId,
+    jsonEl,
+    applyBtn,
+    syncFn,
+  }) {
+    const screen = document.getElementById(screenId);
+    if (!screen || !jsonEl || typeof syncFn !== "function") return;
+
+    const onFieldEdit = () => {
+      try {
+        syncFn({ announce: false });
+      } catch (e) {
+        /* ignore errori di parse durante digitazione */
+      }
+    };
+    screen.querySelectorAll("input, select, textarea").forEach((el) => {
+      if (el === jsonEl) return;
+      const id = el.id || "";
+      if (
+        id.endsWith("DbJson") ||
+        id.endsWith("Json") ||
+        id.endsWith("Cookie")
+      ) {
+        return;
+      }
+      el.addEventListener("input", onFieldEdit);
+      el.addEventListener("change", onFieldEdit);
+    });
+
+    if (applyBtn) {
+      applyBtn.addEventListener("click", () => {
+        try {
+          syncFn({ announce: true });
+        } catch (e) {
+          /* syncFn gestisce status dove previsto */
+        }
+      });
+    }
+  }
+
+  function syncJsonFromFields(jsonEl, applyFn, statusEl, okMsg, opts) {
+    const announce = !!(opts && opts.announce);
+    let payload;
+    try {
+      payload = JSON.parse(jsonEl.value);
+    } catch (e) {
+      if (announce && statusEl) {
+        setStatus(statusEl, `JSON non valido: ${e.message}`, "err");
+      }
+      throw e;
+    }
+    const next = applyFn(payload);
+    jsonEl.value = JSON.stringify(next == null ? payload : next, null, 2);
+    if (announce && statusEl && okMsg) setStatus(statusEl, okMsg, "ok");
+  }
+
+  wireLiveJsonSync({
+    screenId: "screenVt1",
+    jsonEl: vt1Json,
+    applyBtn: vt1ApplyFields,
+    syncFn: (opts) =>
+      syncJsonFromFields(
+        vt1Json,
+        (p) => {
+          applyTopFieldsToPayload(p, collectTopFormValues());
+          applyVenditoreToPayload(p, vt1VenditoreCache);
+          return p;
+        },
+        statusVt1,
+        "JSON aggiornato dai campi.",
+        opts
+      ),
+  });
+
+  wireLiveJsonSync({
+    screenId: "screenEleAv1",
+    jsonEl: eleAv1Json,
+    applyBtn: eleAv1ApplyFields,
+    syncFn: (opts) =>
+      syncJsonFromFields(
+        eleAv1Json,
+        (p) => {
+          applyEleAv1FieldsToPayload(p, collectEleAv1FormValues());
+          applyVenditoreToPayload(p, eleAv1VenditoreCache);
+          return p;
+        },
+        statusEleAv1,
+        "JSON aggiornato dai campi.",
+        opts
+      ),
+  });
+
+  wireLiveJsonSync({
+    screenId: "screenWp1",
+    jsonEl: wp1Json,
+    applyBtn: wp1ApplyFields,
+    syncFn: (opts) =>
+      syncJsonFromFields(
+        wp1Json,
+        (p) => {
+          applyWp1FieldsToPayload(p, collectWp1FormValues());
+          applyVenditoreToPayload(p, wp1VenditoreCache);
+          return p;
+        },
+        statusWp1,
+        "JSON aggiornato dai campi.",
+        opts
+      ),
+  });
+
+  wireLiveJsonSync({
+    screenId: "screenEleEs1100",
+    jsonEl: eleEs1100Json,
+    applyBtn: eleEs1100ApplyFields,
+    syncFn: (opts) =>
+      syncJsonFromFields(
+        eleEs1100Json,
+        (p) => applyEleEs1100FieldsToPayload(p, collectEleEs1100FormValues()),
+        statusEleEs1100,
+        "JSON aggiornato dai campi.",
+        opts
+      ),
+  });
+
+  wireLiveJsonSync({
+    screenId: "screenEleEs1150",
+    jsonEl: eleEs1150Json,
+    applyBtn: eleEs1150ApplyFields,
+    syncFn: (opts) =>
+      syncJsonFromFields(
+        eleEs1150Json,
+        (p) => applyEleEs1150FieldsToPayload(p, collectEleEs1150FormValues()),
+        statusEleEs1150,
+        "JSON aggiornato dai campi.",
+        opts
+      ),
+  });
+
+  wireLiveJsonSync({
+    screenId: "screenGasA01",
+    jsonEl: gasA01Json,
+    applyBtn: gasA01ApplyFields,
+    syncFn: (opts) =>
+      syncJsonFromFields(
+        gasA01Json,
+        (p) => {
+          applyGasA01FieldsToPayload(p, collectGasA01FormValues());
+          applyVenditoreToPayload(p, gasA01VenditoreCache);
+          return p;
+        },
+        statusGasA01,
+        "JSON aggiornato dai campi.",
+        opts
+      ),
+  });
+
+  wireLiveJsonSync({
+    screenId: "screenGasA01150",
+    jsonEl: gasA01150Json,
+    applyBtn: gasA01150ApplyFields,
+    syncFn: (opts) =>
+      syncJsonFromFields(
+        gasA01150Json,
+        (p) => {
+          applyGasA01150FieldsToPayload(p, collectGasA01150FormValues());
+          applyVenditoreToPayload(p, gasA01150VenditoreCache);
+          return p;
+        },
+        statusGasA01150,
+        "JSON aggiornato dai campi.",
+        opts
+      ),
+  });
+
+  wireLiveJsonSync({
+    screenId: "screenSg1",
+    jsonEl: sg1Json,
+    applyBtn: sg1ApplyFields,
+    syncFn: (opts) =>
+      syncJsonFromFields(
+        sg1Json,
+        (p) => {
+          applySg1FieldsToPayload(p, collectSg1FormValues());
+          applyVenditoreToPayload(p, sg1VenditoreCache);
+          return p;
+        },
+        statusSg1,
+        "JSON aggiornato dai campi.",
+        opts
+      ),
+  });
+
+  wireLiveJsonSync({
+    screenId: "screenSg1Dtms",
+    jsonEl: sg1DtmsJson,
+    applyBtn: sg1DtmsApplyFields,
+    syncFn: (opts) =>
+      syncJsonFromFields(
+        sg1DtmsJson,
+        (p) => applySg1DtmsFieldsToPayload(p, collectSg1DtmsFormValues()),
+        statusSg1Dtms,
+        "JSON aggiornato (date = oggi).",
+        opts
+      ),
+  });
+
+  wireLiveJsonSync({
+    screenId: "screenGasA01Dtec",
+    jsonEl: gasA01DtecJson,
+    applyBtn: gasA01DtecApplyFields,
+    syncFn: (opts) =>
+      syncJsonFromFields(
+        gasA01DtecJson,
+        (p) => applyGasA01DtecFieldsToPayload(p, collectGasA01DtecFormValues()),
+        statusGasA01Dtec,
+        "JSON aggiornato dai campi.",
+        opts
+      ),
+  });
+
+  wireLiveJsonSync({
+    screenId: "screenSe1Dtec",
+    jsonEl: se1DtecJson,
+    applyBtn: se1DtecApplyFields,
+    syncFn: (opts) =>
+      syncJsonFromFields(
+        se1DtecJson,
+        (p) => applySe1DtecFieldsToPayload(p, collectSe1DtecFormValues()),
+        statusSe1Dtec,
+        "JSON aggiornato (EXT_DT_DECOR_D = oggi).",
+        opts
+      ),
+  });
+
+  wireLiveJsonSync({
+    screenId: "screenBatchApn",
+    jsonEl: batchApnJson,
+    applyBtn: batchApnApplyFields,
+    syncFn: (opts) => {
+      const payload = buildBatchApnPayload({
+        runId: batchApnRunId.value.trim(),
+        batchType: batchApnBatchType.value.trim() || "MS_083",
+        dlSiiVariantCode: batchApnVariant.value,
+      });
+      syncBatchApnFormFromPayload(payload);
+      if (opts && opts.announce) {
+        setStatus(statusBatchApn, "JSON aggiornato dai campi.", "ok");
+      }
+    },
   });
 });
