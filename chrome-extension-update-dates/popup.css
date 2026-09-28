@@ -1,3 +1,8 @@
+/**
+ * @author Maurizio di Sabato <maurizio.disabato@xcconsulting.it>
+ * @description Stili side panel estensione Hera - avanzamento pratiche
+ * @modified 28.09.2026 - MDS | Pulsanti home più compatti (font 12px, padding ridotto)
+ */
 * {
   box-sizing: border-box;
 }
@@ -104,26 +109,26 @@ textarea:focus {
 
 .choice {
   width: 100%;
-  padding: 6px 12px;
-  margin-bottom: 5px;
+  padding: 4px 10px;
+  margin-bottom: 4px;
   border: none;
-  border-radius: 8px;
+  border-radius: 7px;
   font-weight: 600;
-  font-size: 13px;
+  font-size: 12px;
   cursor: pointer;
   text-align: left;
-  line-height: 1.25;
+  line-height: 1.2;
 }
 
 .choice.primary {
   background: #2563eb;
   color: #fff;
   /* Evita che .primary sottostante allarghi i blu della home */
-  padding: 6px 12px;
-  margin: 0 0 5px;
-  font-size: 13px;
-  line-height: 1.25;
-  border-radius: 8px;
+  padding: 4px 10px;
+  margin: 0 0 4px;
+  font-size: 12px;
+  line-height: 1.2;
+  border-radius: 7px;
 }
 
 .choice.primary:hover {
@@ -141,16 +146,16 @@ textarea:focus {
 
 .primary {
   width: 100%;
-  padding: 6px 12px;
-  margin-top: 5px;
-  margin-bottom: 5px;
+  padding: 5px 10px;
+  margin-top: 4px;
+  margin-bottom: 4px;
   border: none;
-  border-radius: 8px;
+  border-radius: 7px;
   background: #2563eb;
   color: #fff;
   font-weight: 600;
-  font-size: 13px;
-  line-height: 1.25;
+  font-size: 12px;
+  line-height: 1.2;
   cursor: pointer;
 }
 
