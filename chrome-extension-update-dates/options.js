@@ -10,6 +10,7 @@ function normalizeHerokuBase(raw) {
   if (!u) return DEFAULT_HEROKU_BASE;
   // Migrazione da URL completo legacy (…/dlsii/inboundflow)
   u = u.replace(/\/dlsii\/inboundflow\/?$/i, "");
+  u = u.replace(/\/dlsii\/inboundFileFlow\/?$/i, "");
   u = u.replace(/\/dlsii\/ackFileFlow\/?$/i, "");
   u = u.replace(/\/managecomunication\/send-esiti\/?$/i, "");
   u = u.replace(/\/batch\/invoke\/?$/i, "");

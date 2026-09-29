@@ -212,32 +212,32 @@
       </p>
     </section>
 
-    <!-- ELE ES1 100 → /dlsii/inboundflow -->
+    <!-- ELE ES1 100 → /dlsii/inboundFileFlow -->
     <section id="screenEleEs1100" class="hidden">
       <h1>ELE ES1 100</h1>
       <p class="hint">
-        Endpoint <code>/dlsii/inboundflow</code> · <code>ES1.0100</code>.
-        DOCUMENTKEY / RIF_EXT da amc.request + schermata.
+        Endpoint <code>/dlsii/inboundFileFlow</code> · <code>ES1.0100</code> (CSV, evento
+        <code>0S1</code>). Codice pratica da tab / amc.request.
       </p>
       <button type="button" id="scrapeAgainEleEs1100" class="secondary full">Refresh dati</button>
       <label class="field">
-        <span>DOCUMENTKEY</span>
+        <span>Campo 6 — codice pratica</span>
         <input type="text" id="eleEs1100Documentkey" autocomplete="off" spellcheck="false" />
       </label>
       <label class="field">
-        <span>RIF_EXT (Codice pratica SII)</span>
+        <span>Campo 7 — codice pratica DL (default …_DL)</span>
         <input type="text" id="eleEs1100RifExt" autocomplete="off" spellcheck="false" />
       </label>
       <label class="field">
-        <span>DES_ESITO_VERIFICA_AMM</span>
+        <span>Campo 8 — esito ammissibilità</span>
         <input type="text" id="eleEs1100DesEsito" autocomplete="off" spellcheck="false" value="1" />
       </label>
       <label class="field">
-        <span>CODERR_AEEG</span>
+        <span>Campo 9</span>
         <input type="text" id="eleEs1100Coderr" autocomplete="off" spellcheck="false" />
       </label>
       <label class="field">
-        <span>EXT_ANNOTAZIONI</span>
+        <span>Campo 10</span>
         <input type="text" id="eleEs1100Annotazioni" autocomplete="off" spellcheck="false" />
       </label>
       <p class="hint vt1-auth-hint">

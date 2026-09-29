@@ -2,35 +2,25 @@
   "stagingAreaDLScartiTestataId": null,
   "prestazione": {
     "header": {
-      "distributore": "13D0000001",
+      "distributore": "13D0000014",
       "venditore": "13V0000000",
       "causale": "ES1",
       "flusso": "0100",
-      "user": "aurelio.friscia@consulenti.gruppohera.it",
-      "servizio": null,
-      "idFileModello": null,
-      "estensione": "CSV",
-      "righeTestata": "1",
-      "esito": null,
-      "descrizioneEsito": null,
       "evento": "0S1",
-      "nomeMessaggio": null,
-      "societaDiVendita": null,
-      "codiceCausale": null,
-      "nomeDistributore": null,
-      "percorso": null
+      "user": "aurelio.friscia@consulenti.gruppohera.it",
+      "estensione": "CSV",
+      "righeTestata": "1"
     },
-    "template": null,
     "righe": [
       {
         "fields": [
-          { "field": "CODCAUS", "value": "ES1" },
-          { "field": "COD_FLUSSO", "value": "0100" },
-          { "field": "DOCUMENTKEY", "value": "" },
-          { "field": "RIF_EXT", "value": "" },
-          { "field": "DES_ESITO_VERIFICA_AMM", "value": "1" },
-          { "field": "CODERR_AEEG", "value": "" },
-          { "field": "EXT_ANNOTAZIONI", "value": "" }
+          { "field": "1", "value": "ES1" },
+          { "field": "2", "value": "0100" },
+          { "field": "6", "value": "" },
+          { "field": "7", "value": "" },
+          { "field": "8", "value": "1" },
+          { "field": "9", "value": "" },
+          { "field": "10", "value": "" }
         ]
       }
     ]

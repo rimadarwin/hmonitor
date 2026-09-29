@@ -1,6 +1,7 @@
 /**
  * @author Maurizio di Sabato <maurizio.disabato@xcconsulting.it>
  * @description Popup/side panel: date, switch ATOA/FILE, flussi Heroku con populate da amc.request
+ * @modified 29.09.2026 - MDS | ES1 100 → inboundFileFlow, payload CSV campi numerici
  * @modified 29.09.2026 - MDS | ES1 ACK: URL da base Heroku, correlation_id da /dlsii-ack-context
  * @modified 29.09.2026 - MDS | Flusso ELE ES1 ACK (POST /dlsii/ackFileFlow, recovery 0050)
  * @modified 29.09.2026 - MDS | Flusso GAS VTG 150 (inboundflow, evento 09T)
@@ -17,6 +18,7 @@ const DEFAULT_HEROKU_BASE =
   "https://gh-manage-co-dev-int-a0c1c0ddf5f3.herokuapp.com";
 /** Path fissi per flusso (base URL da Impostazioni). */
 const PATH_DLSII_INBOUND = "/dlsii/inboundflow";
+const PATH_DLSII_INBOUND_FILE = "/dlsii/inboundFileFlow";
 const PATH_DLSII_ACK_FILE = "/dlsii/ackFileFlow";
 const PATH_SEND_ESITI = "/managecomunication/send-esiti";
 const PATH_BATCH_INVOKE = "/batch/invoke";
@@ -119,6 +121,7 @@ function normalizeHerokuBase(raw) {
   let u = (raw || "").trim().replace(/\/+$/, "");
   if (!u) return DEFAULT_HEROKU_BASE;
   u = u.replace(/\/dlsii\/inboundflow\/?$/i, "");
+  u = u.replace(/\/dlsii\/inboundFileFlow\/?$/i, "");
   u = u.replace(/\/dlsii\/ackFileFlow\/?$/i, "");
   u = u.replace(/\/managecomunication\/send-esiti\/?$/i, "");
   u = u.replace(/\/batch\/invoke\/?$/i, "");
@@ -145,6 +148,11 @@ async function buildHerokuUrl(path) {
 /** VT1 / WP1 / SG1 GAS → /dlsii/inboundflow */
 async function getVt1Url() {
   return buildHerokuUrl(PATH_DLSII_INBOUND);
+}
+
+/** ELE ES1 100 (FILE) → /dlsii/inboundFileFlow */
+async function getEleEs1100Url() {
+  return buildHerokuUrl(PATH_DLSII_INBOUND_FILE);
 }
 
 /** ELE ES1 ACK recovery → /dlsii/ackFileFlow */
@@ -265,13 +273,25 @@ function applyEleEs1AckFieldsToPayload(payload, values) {
 
 function applyEleEs1100FieldsToPayload(payload, values) {
   const p = typeof payload === "string" ? JSON.parse(payload) : payload;
+  const hdr = p?.prestazione?.header;
+  if (hdr) {
+    hdr.evento = "0S1";
+    if (values.venditoreCodice) hdr.venditore = values.venditoreCodice;
+    if (values.distributoreCodice) hdr.distributore = values.distributoreCodice;
+  }
+  const pratica = (values.requestCode || values.documentkey || "").trim();
+  const praticaDl =
+    (values.codPraticaDl || values.rif_ext || "").trim() ||
+    (pratica ? `${pratica}_DL` : "");
   const fields = getPrestazioneFieldsArray(p);
   setFieldsFromMap(fields, {
-    DOCUMENTKEY: values.documentkey,
-    RIF_EXT: values.rif_ext,
-    DES_ESITO_VERIFICA_AMM: values.desEsitoVerificaAmm || "1",
-    CODERR_AEEG: values.coderrAeeg || "",
-    EXT_ANNOTAZIONI: values.extAnnotazioni || "",
+    1: "ES1",
+    2: "0100",
+    6: pratica,
+    7: praticaDl,
+    8: values.desEsitoVerificaAmm || "1",
+    9: values.coderrAeeg || "",
+    10: values.extAnnotazioni || "",
   });
   return p;
 }
@@ -1801,19 +1821,29 @@ document.addEventListener("DOMContentLoaded", () => {
     eleAv1TensFase.value = top.extTensFase || "BT_MONOFASE";
   }
 
+  let eleEs1100VenditoreCache = "";
+  let eleEs1100DistributoreCache = "";
+
   function collectEleEs1100FormValues() {
+    const requestCode = eleEs1100Documentkey.value.trim();
     return {
-      documentkey: eleEs1100Documentkey.value.trim(),
+      requestCode,
+      documentkey: requestCode,
+      codPraticaDl: eleEs1100RifExt.value.trim(),
       rif_ext: eleEs1100RifExt.value.trim(),
       desEsitoVerificaAmm: eleEs1100DesEsito.value.trim() || "1",
       coderrAeeg: eleEs1100Coderr.value.trim(),
       extAnnotazioni: eleEs1100Annotazioni.value.trim(),
+      venditoreCodice: eleEs1100VenditoreCache,
+      distributoreCodice: eleEs1100DistributoreCache,
     };
   }
 
   function fillEleEs1100InputsFromTop(top) {
-    eleEs1100Documentkey.value = top.documentkey || "";
-    eleEs1100RifExt.value = top.rif_ext || "";
+    const code = top.requestCode || top.documentkey || "";
+    eleEs1100Documentkey.value = code;
+    eleEs1100RifExt.value =
+      top.codPraticaDl || top.rif_ext || (code ? `${code}_DL` : "");
     eleEs1100DesEsito.value = top.desEsitoVerificaAmm || "1";
     eleEs1100Coderr.value = top.coderrAeeg || "";
     eleEs1100Annotazioni.value = top.extAnnotazioni || "";
@@ -2619,9 +2649,12 @@ document.addEventListener("DOMContentLoaded", () => {
       const ctx = await loadRequestContextForFlow();
       setDbJsonBox(eleEs1100DbJson, ctx.db);
       const v = ctx.values;
+      eleEs1100VenditoreCache = v.venditoreCodice || "13V0000000";
+      eleEs1100DistributoreCache =
+        pickFlat(v.flat, "DISTRIBUTORE", "COD_DISTRIBUTORE", "CODICE_DISTRIBUTORE") ||
+        "13D0000014";
       fillEleEs1100InputsFromTop({
-        documentkey: v.documentkey,
-        rif_ext: v.rif_ext,
+        requestCode: v.requestCode,
         desEsitoVerificaAmm: "1",
         coderrAeeg: "",
         extAnnotazioni: "",
@@ -2883,7 +2916,7 @@ document.addEventListener("DOMContentLoaded", () => {
     eleEs1100Send.disabled = true;
     setStatus(statusEleEs1100, "Invio in corso…", "");
     try {
-      const endpoint = await getVt1Url();
+      const endpoint = await getEleEs1100Url();
       console.debug("[ELE ES1 100] POST", endpoint);
       const headers = {
         "Content-Type": "application/json",
