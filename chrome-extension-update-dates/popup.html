@@ -3,6 +3,7 @@
 <!--
   @author Maurizio di Sabato <maurizio.disabato@xcconsulting.it>
   @description Side panel estensione Hera - avanzamento pratiche
+  @modified 29.09.2026 - MDS | Flusso GAS VTG 150 (inboundflow, evento 09T)
   @modified 28.09.2026 - MDS | Rimuove titolo Operazioni dalla home
   @modified 28.09.2026 - MDS | Flussi ELE ES1 100 e ELE ES1 150 (inboundflow)
   @modified 24.09.2026 - MDS | Pulsante blu Mockup CP1 (simulatore_risposta_campi)
@@ -32,6 +33,7 @@
       <button type="button" id="goWp1" class="choice accent">ELE WP1 150</button>
       <button type="button" id="goGasA01" class="choice accent">GAS A01 100</button>
       <button type="button" id="goGasA01150" class="choice accent">GAS A01 150</button>
+      <button type="button" id="goGasVtg150" class="choice accent">GAS VTG 150</button>
       <button type="button" id="goGasA01Dtec" class="choice accent">GAS A01 DTEC</button>
       <button type="button" id="goSg1" class="choice accent">GAS SG1 300</button>
       <button type="button" id="goSg1Dtms" class="choice accent">GAS SG1 DTMS</button>
@@ -586,6 +588,93 @@
       <button type="button" id="backFromGasA01150" class="linkish">← Indietro</button>
       <p class="footer tight">
         <a href="#" id="openOptionsGasA01150">Impostazioni</a>
+      </p>
+    </section>
+
+    <!-- GAS VTG 150 → /dlsii/inboundflow -->
+    <section id="screenGasVtg150" class="hidden">
+      <h1>GAS VTG 150</h1>
+      <p class="hint">
+        Endpoint <code>/dlsii/inboundflow</code> · <code>VTG.0150</code>, evento <code>09T</code>.
+        Campi da amc.request + schermata; <code>EXT_DATA_ESEC</code> = oggi (AAAAMMGG).
+      </p>
+      <button type="button" id="scrapeAgainGasVtg150" class="secondary full">Refresh dati</button>
+      <label class="field">
+        <span>DOCUMENTKEY</span>
+        <input type="text" id="gasVtg150Documentkey" autocomplete="off" spellcheck="false" />
+      </label>
+      <label class="field">
+        <span>RIF_EXT (Codice pratica SII)</span>
+        <input type="text" id="gasVtg150RifExt" autocomplete="off" spellcheck="false" />
+      </label>
+      <label class="field">
+        <span>POD / PDR</span>
+        <input type="text" id="gasVtg150Pod" autocomplete="off" spellcheck="false" />
+      </label>
+      <label class="field">
+        <span>EXT_DATA_ESEC (AAAAMMGG)</span>
+        <input type="text" id="gasVtg150ExtData" autocomplete="off" spellcheck="false" />
+      </label>
+      <label class="field">
+        <span>DES_ESITO_ATTIVITA</span>
+        <input type="text" id="gasVtg150DesEsito" autocomplete="off" spellcheck="false" value="1" />
+      </label>
+      <label class="field">
+        <span>EXT_CODERR_AEEG</span>
+        <input type="text" id="gasVtg150Coderr" autocomplete="off" spellcheck="false" />
+      </label>
+      <label class="field">
+        <span>EXT_ANNOTAZIONI</span>
+        <input type="text" id="gasVtg150Annotazioni" autocomplete="off" spellcheck="false" />
+      </label>
+      <p class="subhint">Dati cliente (Z_*)</p>
+      <label class="field">
+        <span>Z_NOME</span>
+        <input type="text" id="gasVtg150Nome" autocomplete="off" spellcheck="false" />
+      </label>
+      <label class="field">
+        <span>Z_COGNOME</span>
+        <input type="text" id="gasVtg150Cognome" autocomplete="off" spellcheck="false" />
+      </label>
+      <label class="field">
+        <span>Z_RAGSOC</span>
+        <input type="text" id="gasVtg150Ragsoc" autocomplete="off" spellcheck="false" />
+      </label>
+      <label class="field">
+        <span>Z_CODICE_FISCALE</span>
+        <input type="text" id="gasVtg150Cf" autocomplete="off" spellcheck="false" />
+      </label>
+      <label class="field">
+        <span>Z_PARTITA_IVA</span>
+        <input type="text" id="gasVtg150Piva" autocomplete="off" spellcheck="false" />
+      </label>
+      <label class="field">
+        <span>Z_CF_STRANIERO</span>
+        <input type="text" id="gasVtg150CfStraniero" autocomplete="off" spellcheck="false" />
+      </label>
+      <p class="hint vt1-auth-hint">
+        <strong>Authorization</strong> e cookie: stesse impostazioni VT1 in
+        <a href="#" id="openOptionsGasVtg150Auth">Impostazioni</a>.
+      </p>
+      <label class="field">
+        <span>Cookie (opzionale, es. JSESSIONID=…)</span>
+        <input type="text" id="gasVtg150Cookie" autocomplete="off" spellcheck="false" />
+      </label>
+      <label class="field">
+        <span>Dati da amc.request (id_request + input)</span>
+        <textarea id="gasVtg150DbJson" rows="8" spellcheck="false" readonly></textarea>
+      </label>
+      <label class="field">
+        <span>Corpo JSON</span>
+        <textarea id="gasVtg150Json" rows="10" spellcheck="false"></textarea>
+      </label>
+      <button type="button" id="gasVtg150ApplyFields" class="secondary full">Aggiorna JSON dai campi sopra</button>
+      <button type="button" id="gasVtg150Send" class="primary">Invia richiesta</button>
+      <div id="statusGasVtg150" class="status" aria-live="polite"></div>
+      <pre id="logGasVtg150" class="log hidden"></pre>
+      <button type="button" id="backFromGasVtg150" class="linkish">← Indietro</button>
+      <p class="footer tight">
+        <a href="#" id="openOptionsGasVtg150">Impostazioni</a>
       </p>
     </section>
 

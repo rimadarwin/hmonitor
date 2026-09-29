@@ -1,6 +1,7 @@
 /**
  * @author Maurizio di Sabato <maurizio.disabato@xcconsulting.it>
  * @description Popup/side panel: date, switch ATOA/FILE, flussi Heroku con populate da amc.request
+ * @modified 29.09.2026 - MDS | Flusso GAS VTG 150 (inboundflow, evento 09T)
  * @modified 28.09.2026 - MDS | Sync automatico input → corpo JSON su tutti i flussi
  * @modified 28.09.2026 - MDS | Flussi ELE ES1 100 e ELE ES1 150 (inboundflow, struttura righe)
  * @modified 28.09.2026 - MDS | Scrape CF/P.IVA/Codice Pratica SII con alias etichette UI
@@ -304,6 +305,12 @@ async function loadDefaultGasA01Payload() {
 async function loadDefaultGasA01150Payload() {
   const res = await fetch(chrome.runtime.getURL("gas-a01-150-default-payload.json"));
   if (!res.ok) throw new Error("Impossibile caricare il template GAS A01 150 JSON.");
+  return res.json();
+}
+
+async function loadDefaultGasVtg150Payload() {
+  const res = await fetch(chrome.runtime.getURL("gas-vtg-150-default-payload.json"));
+  if (!res.ok) throw new Error("Impossibile caricare il template GAS VTG 150 JSON.");
   return res.json();
 }
 
@@ -827,6 +834,39 @@ function readGasA01150FieldsFromPayload(payload) {
   return { ...base, extDataEsec: extDataEsec || todayYYYYMMDD() };
 }
 
+/** Applica campi form al payload GAS VTG 150 (evento 09T). */
+function applyGasVtg150FieldsToPayload(payload, values) {
+  const p = typeof payload === "string" ? JSON.parse(payload) : payload;
+  p.evento = "09T";
+  const fields = p?.prestazione?.requests?.[0]?.fields;
+  if (!Array.isArray(fields)) return p;
+  const map = {
+    DOCUMENTKEY: values.documentkey,
+    RIF_EXT: values.rif_ext,
+    POD: values.pod,
+    DES_ESITO_ATTIVITA: values.desEsitoAttivita || "1",
+    EXT_CODERR_AEEG: values.extCoderrAeeg || "",
+    EXT_ANNOTAZIONI: values.extAnnotazioni || "",
+    Z_CODICE_FISCALE: values.zCodiceFiscale || "",
+    Z_PARTITA_IVA: values.zPartitaIva || "",
+    Z_CF_STRANIERO: values.zCfStraniero || "",
+    Z_NOME: values.zNome || "",
+    Z_COGNOME: values.zCognome || "",
+    Z_RAGSOC: values.zRagsoc || "",
+    EXT_DATA_ESEC:
+      normalizeDateToYYYYMMDD(values.extDataEsec) ||
+      values.extDataEsec ||
+      todayYYYYMMDD(),
+  };
+  for (const row of fields) {
+    if (Object.prototype.hasOwnProperty.call(map, row.field)) {
+      const v = map[row.field];
+      row.value = v == null ? "" : String(v);
+    }
+  }
+  return p;
+}
+
 /**
  * Eseguito nel contesto della pagina (tab attivo).
  * Attraversa Shadow DOM (open) e iframe same-origin: spesso i valori non compaiono
@@ -1291,6 +1331,7 @@ function showScreen(name) {
   const wp1 = document.getElementById("screenWp1");
   const gasA01 = document.getElementById("screenGasA01");
   const gasA01150 = document.getElementById("screenGasA01150");
+  const gasVtg150 = document.getElementById("screenGasVtg150");
   const gasA01Dtec = document.getElementById("screenGasA01Dtec");
   const sg1 = document.getElementById("screenSg1");
   const sg1Dtms = document.getElementById("screenSg1Dtms");
@@ -1308,6 +1349,7 @@ function showScreen(name) {
   if (wp1) wp1.classList.toggle("hidden", name !== "wp1");
   if (gasA01) gasA01.classList.toggle("hidden", name !== "gasA01");
   if (gasA01150) gasA01150.classList.toggle("hidden", name !== "gasA01150");
+  if (gasVtg150) gasVtg150.classList.toggle("hidden", name !== "gasVtg150");
   if (gasA01Dtec) gasA01Dtec.classList.toggle("hidden", name !== "gasA01Dtec");
   if (sg1) sg1.classList.toggle("hidden", name !== "sg1");
   if (sg1Dtms) sg1Dtms.classList.toggle("hidden", name !== "sg1Dtms");
@@ -1332,6 +1374,7 @@ document.addEventListener("DOMContentLoaded", () => {
   let sg1VenditoreCache = "";
   let gasA01VenditoreCache = "";
   let gasA01150VenditoreCache = "";
+  let gasVtg150VenditoreCache = "";
 
   const goDates = document.getElementById("goDates");
   const goCanale = document.getElementById("goCanale");
@@ -1344,6 +1387,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const goWp1 = document.getElementById("goWp1");
   const goGasA01 = document.getElementById("goGasA01");
   const goGasA01150 = document.getElementById("goGasA01150");
+  const goGasVtg150 = document.getElementById("goGasVtg150");
   const goGasA01Dtec = document.getElementById("goGasA01Dtec");
   const goSg1 = document.getElementById("goSg1");
   const goSg1Dtms = document.getElementById("goSg1Dtms");
@@ -1503,6 +1547,29 @@ document.addEventListener("DOMContentLoaded", () => {
   const statusGasA01150 = document.getElementById("statusGasA01150");
   const logGasA01150 = document.getElementById("logGasA01150");
   const backFromGasA01150 = document.getElementById("backFromGasA01150");
+  const scrapeAgainGasVtg150 = document.getElementById("scrapeAgainGasVtg150");
+  const gasVtg150Documentkey = document.getElementById("gasVtg150Documentkey");
+  const gasVtg150RifExt = document.getElementById("gasVtg150RifExt");
+  const gasVtg150Pod = document.getElementById("gasVtg150Pod");
+  const gasVtg150ExtData = document.getElementById("gasVtg150ExtData");
+  const gasVtg150DesEsito = document.getElementById("gasVtg150DesEsito");
+  const gasVtg150Coderr = document.getElementById("gasVtg150Coderr");
+  const gasVtg150Annotazioni = document.getElementById("gasVtg150Annotazioni");
+  const gasVtg150Nome = document.getElementById("gasVtg150Nome");
+  const gasVtg150Cognome = document.getElementById("gasVtg150Cognome");
+  const gasVtg150Ragsoc = document.getElementById("gasVtg150Ragsoc");
+  const gasVtg150Cf = document.getElementById("gasVtg150Cf");
+  const gasVtg150Piva = document.getElementById("gasVtg150Piva");
+  const gasVtg150CfStraniero = document.getElementById("gasVtg150CfStraniero");
+  const gasVtg150Cookie = document.getElementById("gasVtg150Cookie");
+  const gasVtg150DbJson = document.getElementById("gasVtg150DbJson");
+  const gasVtg150Json = document.getElementById("gasVtg150Json");
+  const gasVtg150ApplyFields = document.getElementById("gasVtg150ApplyFields");
+  const gasVtg150Send = document.getElementById("gasVtg150Send");
+  const statusGasVtg150 = document.getElementById("statusGasVtg150");
+  const logGasVtg150 = document.getElementById("logGasVtg150");
+  const backFromGasVtg150 = document.getElementById("backFromGasVtg150");
+
 
   const scrapeAgainGasA01Dtec = document.getElementById("scrapeAgainGasA01Dtec");
   const gasA01DtecRequestId = document.getElementById("gasA01DtecRequestId");
@@ -1616,6 +1683,8 @@ document.addEventListener("DOMContentLoaded", () => {
     document.getElementById("openOptionsGasA01Auth"),
     document.getElementById("openOptionsGasA01150"),
     document.getElementById("openOptionsGasA01150Auth"),
+    document.getElementById("openOptionsGasVtg150"),
+    document.getElementById("openOptionsGasVtg150Auth"),
     document.getElementById("openOptionsGasA01Dtec"),
     document.getElementById("openOptionsGasA01DtecAuth"),
     document.getElementById("openOptionsSg1"),
@@ -1780,6 +1849,40 @@ document.addEventListener("DOMContentLoaded", () => {
     gasA01Documentkey.value = top.documentkey || "";
     gasA01RifExt.value = top.rif_ext || "";
     gasA01CodPdr.value = top.codPdr || "";
+  }
+
+  function collectGasVtg150FormValues() {
+    return {
+      documentkey: gasVtg150Documentkey.value.trim(),
+      rif_ext: gasVtg150RifExt.value.trim(),
+      pod: gasVtg150Pod.value.trim(),
+      extDataEsec: gasVtg150ExtData.value.trim() || todayYYYYMMDD(),
+      desEsitoAttivita: gasVtg150DesEsito.value.trim() || "1",
+      extCoderrAeeg: gasVtg150Coderr.value.trim(),
+      extAnnotazioni: gasVtg150Annotazioni.value.trim(),
+      zNome: gasVtg150Nome.value.trim(),
+      zCognome: gasVtg150Cognome.value.trim(),
+      zRagsoc: gasVtg150Ragsoc.value.trim(),
+      zCodiceFiscale: gasVtg150Cf.value.trim(),
+      zPartitaIva: gasVtg150Piva.value.trim(),
+      zCfStraniero: gasVtg150CfStraniero.value.trim(),
+    };
+  }
+
+  function fillGasVtg150InputsFromTop(top) {
+    gasVtg150Documentkey.value = top.documentkey || "";
+    gasVtg150RifExt.value = top.rif_ext || "";
+    gasVtg150Pod.value = top.pod || "";
+    gasVtg150ExtData.value = top.extDataEsec || todayYYYYMMDD();
+    gasVtg150DesEsito.value = top.desEsitoAttivita || "1";
+    gasVtg150Coderr.value = top.extCoderrAeeg || "";
+    gasVtg150Annotazioni.value = top.extAnnotazioni || "";
+    gasVtg150Nome.value = top.zNome || "";
+    gasVtg150Cognome.value = top.zCognome || "";
+    gasVtg150Ragsoc.value = top.zRagsoc || "";
+    gasVtg150Cf.value = top.zCodiceFiscale || "";
+    gasVtg150Piva.value = top.zPartitaIva || "";
+    gasVtg150CfStraniero.value = top.zCfStraniero || "";
   }
 
   function collectGasA01150FormValues() {
@@ -2019,6 +2122,14 @@ document.addEventListener("DOMContentLoaded", () => {
     await populateGasA01150Screen(true);
   });
 
+  goGasVtg150.addEventListener("click", async () => {
+    showScreen("gasVtg150");
+    logGasVtg150.classList.add("hidden");
+    logGasVtg150.textContent = "";
+    setStatus(statusGasVtg150, "Caricamento…", "");
+    await populateGasVtg150Screen(true);
+  });
+
   goGasA01Dtec.addEventListener("click", async () => {
     showScreen("gasA01Dtec");
     logGasA01Dtec.classList.add("hidden");
@@ -2070,6 +2181,7 @@ document.addEventListener("DOMContentLoaded", () => {
   backFromWp1.addEventListener("click", () => showScreen("home"));
   backFromGasA01.addEventListener("click", () => showScreen("home"));
   backFromGasA01150.addEventListener("click", () => showScreen("home"));
+  backFromGasVtg150.addEventListener("click", () => showScreen("home"));
   backFromGasA01Dtec.addEventListener("click", () => showScreen("home"));
   backFromSg1.addEventListener("click", () => showScreen("home"));
   backFromSg1Dtms.addEventListener("click", () => showScreen("home"));
@@ -3037,10 +3149,115 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
+  async function populateGasVtg150Screen(_doScrape) {
+    try {
+      setStatus(statusGasVtg150, "Carico dati da amc.request…", "");
+      const basePayload = await loadDefaultGasVtg150Payload();
+      const payload = deepClone(basePayload);
+      const ctx = await loadRequestContextForFlow();
+      setDbJsonBox(gasVtg150DbJson, ctx.db);
+      const v = ctx.values;
+      fillGasVtg150InputsFromTop({
+        documentkey: v.documentkey,
+        rif_ext: v.rif_ext,
+        pod: pickFlat(v.flat, "PDR", "COD_PDR", "CODICE_PDR", "POD") || v.pod,
+        extDataEsec:
+          normalizeDateToYYYYMMDD(v.extDataEsec) || todayYYYYMMDD(),
+        desEsitoAttivita: "1",
+        extCoderrAeeg: "",
+        extAnnotazioni: "",
+        zNome: v.zNome || v.extNome,
+        zCognome: v.zCognome || v.extCognome,
+        zRagsoc: v.zRagsoc || v.extRagsoc,
+        zCodiceFiscale: v.zCodiceFiscale || v.extCodFiscale,
+        zPartitaIva: v.zPartitaIva || v.extPartitaIva,
+        zCfStraniero: pickFlat(v.flat, "Z_CF_STRANIERO", "CF_STRANIERO") || "",
+      });
+      applyGasVtg150FieldsToPayload(payload, collectGasVtg150FormValues());
+      gasVtg150VenditoreCache = v.venditoreCodice || "";
+      applyVenditoreToPayload(payload, gasVtg150VenditoreCache);
+      const sec = await getVt1LocalForAuth();
+      gasVtg150Cookie.value = sec.vt1Cookie || "";
+      gasVtg150Json.value = JSON.stringify(payload, null, 2);
+      setStatus(
+        statusGasVtg150,
+        `Dati da DB · id_request=${v.id_request ?? "—"} · ${v.requestCode}`,
+        "ok"
+      );
+    } catch (e) {
+      setDbJsonBox(gasVtg150DbJson, { ok: false, error: String(e.message || e) });
+      setStatus(statusGasVtg150, String(e.message || e), "err");
+    }
+  }
+
   scrapeAgainGasA01150.addEventListener("click", async () => {
     scrapeAgainGasA01150.disabled = true;
     await populateGasA01150Screen(true);
     scrapeAgainGasA01150.disabled = false;
+  });
+
+  scrapeAgainGasVtg150.addEventListener("click", async () => {
+    scrapeAgainGasVtg150.disabled = true;
+    await populateGasVtg150Screen(true);
+    scrapeAgainGasVtg150.disabled = false;
+  });
+
+  gasVtg150Send.addEventListener("click", async () => {
+    logGasVtg150.classList.add("hidden");
+    logGasVtg150.textContent = "";
+    const authLocal = await getVt1LocalForAuth();
+    const authBuilt = buildVt1AuthorizationHeader(authLocal);
+    if (!authBuilt.ok) {
+      setStatus(statusGasVtg150, authBuilt.message, "err");
+      return;
+    }
+    let bodyObj;
+    try {
+      bodyObj = JSON.parse(gasVtg150Json.value);
+    } catch (e) {
+      setStatus(statusGasVtg150, `JSON non valido: ${e.message}`, "err");
+      return;
+    }
+    applyGasVtg150FieldsToPayload(bodyObj, collectGasVtg150FormValues());
+    applyVenditoreToPayload(bodyObj, gasVtg150VenditoreCache);
+    const bodyStr = JSON.stringify(bodyObj);
+    gasVtg150Json.value = JSON.stringify(bodyObj, null, 2);
+    gasVtg150Send.disabled = true;
+    setStatus(statusGasVtg150, "Invio in corso…", "");
+    try {
+      const endpoint = await getVt1Url();
+      console.debug("[GAS VTG 150] POST", endpoint);
+      const headers = {
+        "Content-Type": "application/json",
+        Authorization: authBuilt.value,
+      };
+      const cookie = gasVtg150Cookie.value.trim();
+      if (cookie) headers.Cookie = cookie;
+      const res = await fetch(endpoint, { method: "POST", headers, body: bodyStr });
+      const textRes = await res.text();
+      let pretty = textRes;
+      try {
+        pretty = JSON.stringify(JSON.parse(textRes), null, 2);
+      } catch {
+        /* testo puro */
+      }
+      if (!res.ok) {
+        setStatus(statusGasVtg150, `HTTP ${res.status}`, "err");
+        logGasVtg150.textContent = pretty;
+        logGasVtg150.classList.remove("hidden");
+        return;
+      }
+      setStatus(statusGasVtg150, `OK · HTTP ${res.status}`, "ok");
+      if (pretty) {
+        logGasVtg150.textContent = pretty;
+        logGasVtg150.classList.remove("hidden");
+      }
+      await chrome.storage.local.set({ vt1Cookie: cookie });
+    } catch (e) {
+      setStatus(statusGasVtg150, String(e.message || e), "err");
+    } finally {
+      gasVtg150Send.disabled = false;
+    }
   });
 
 
@@ -3861,6 +4078,24 @@ document.addEventListener("DOMContentLoaded", () => {
           return p;
         },
         statusGasA01,
+        "JSON aggiornato dai campi.",
+        opts
+      ),
+  });
+
+  wireLiveJsonSync({
+    screenId: "screenGasVtg150",
+    jsonEl: gasVtg150Json,
+    applyBtn: gasVtg150ApplyFields,
+    syncFn: (opts) =>
+      syncJsonFromFields(
+        gasVtg150Json,
+        (p) => {
+          applyGasVtg150FieldsToPayload(p, collectGasVtg150FormValues());
+          applyVenditoreToPayload(p, gasVtg150VenditoreCache);
+          return p;
+        },
+        statusGasVtg150,
         "JSON aggiornato dai campi.",
         opts
       ),

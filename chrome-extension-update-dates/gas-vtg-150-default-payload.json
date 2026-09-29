@@ -1,0 +1,46 @@
+{
+  "stagingAreaDLScartiTestataId": null,
+  "evento": "09T",
+  "dataComunicazioneSii": null,
+  "prestazione": {
+    "header": {
+      "distributore": "10D00000AU",
+      "venditore": "10V0000000",
+      "causale": "VTG",
+      "flusso": "0150",
+      "user": "utente_hera_acn",
+      "servizio": null,
+      "operazione": null,
+      "erogatore": null,
+      "fruitore": null,
+      "esito": null,
+      "descrizioneEsito": null,
+      "namespace": null,
+      "isNewco": null
+    },
+    "requests": [
+      {
+        "fields": [
+          { "field": "CODCAUS", "value": "VTG" },
+          { "field": "COD_FLUSSO", "value": "0150" },
+          { "field": "PIVA_MITT", "value": "02221101203" },
+          { "field": "PIVA_DEST", "value": "05877611003" },
+          { "field": "DOCUMENTKEY", "value": "" },
+          { "field": "RIF_EXT", "value": "" },
+          { "field": "POD", "value": "" },
+          { "field": "DES_ESITO_ATTIVITA", "value": "1" },
+          { "field": "EXT_CODERR_AEEG", "value": "" },
+          { "field": "EXT_ANNOTAZIONI", "value": "" },
+          { "field": "Z_CODICE_FISCALE", "value": "" },
+          { "field": "Z_PARTITA_IVA", "value": "" },
+          { "field": "Z_CF_STRANIERO", "value": "" },
+          { "field": "Z_NOME", "value": "" },
+          { "field": "Z_COGNOME", "value": "" },
+          { "field": "Z_RAGSOC", "value": "" },
+          { "field": "EXT_DATA_ESEC", "value": "" }
+        ]
+      }
+    ],
+    "strutturaRipetibile": null
+  }
+}
