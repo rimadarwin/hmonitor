@@ -4,6 +4,7 @@
 @description Server Flask per estensione Chrome (date, switch canale, request-data)
 @modified 24.09.2026 - MDS | Endpoint Mockup CP1 load/update (simulatore_risposta_campi)
 @modified 23.09.2026 - MDS | Endpoint POST /riporta-sospeso (amc.sap_messages)
+@modified 29.09.2026 - MDS | Endpoint POST /dlsii-ack-context (correlation_id messaggio 0050)
 @modified 23.09.2026 - MDS | Endpoint POST /request-data (id_request + input da amc.request)
 
 Server HTTP locale per l'estensione Chrome: espone POST /update che esegue
@@ -23,6 +24,7 @@ from flask_cors import CORS
 from update_request_dates import UpdateResult, run_update_request_dates
 from switch_canale_com import run_switch_canale_com
 from fetch_request_data import run_fetch_request_data
+from fetch_dlsii_ack_context import run_fetch_dlsii_ack_context
 from riporta_in_sospeso import run_riporta_in_sospeso
 from mockup_cp1 import run_mockup_cp1_load, run_mockup_cp1_update
 
@@ -64,6 +66,7 @@ def root():
                 "/update",
                 "/switch-canale",
                 "/request-data",
+                "/dlsii-ack-context",
                 "/riporta-sospeso",
                 "/mockup-cp1/load",
                 "/mockup-cp1/update",
@@ -116,6 +119,27 @@ def request_data():
             "request_code": result.request_code,
             "id_request": result.id_request,
             "input": result.input,
+            "error": result.error,
+        }
+    ), status
+
+
+@app.post("/dlsii-ack-context")
+def dlsii_ack_context():
+    """
+    Ultimo messaggio DLSII 0050 INVIATO con correlation_id per la pratica.
+    Body: { "request_code": "A000…" }
+    """
+    data = request.get_json(silent=True) or {}
+    request_code = data.get("request_code", "")
+    result = run_fetch_dlsii_ack_context(request_code)
+    status = 200 if result.ok else 400
+    return jsonify(
+        {
+            "ok": result.ok,
+            "request_code": result.request_code,
+            "dlsii": result.row,
+            "correlation_id": (result.row or {}).get("correlation_id") if result.row else None,
             "error": result.error,
         }
     ), status
@@ -188,6 +212,7 @@ def main():
     print("  POST /update         JSON: {\"request_code\": \"V00000030814\"}")
     print("  POST /switch-canale  JSON: {\"request_code\": \"…\", \"target\": \"FILE\"?}")
     print("  POST /request-data   JSON: {\"request_code\": \"…\"}")
+    print("  POST /dlsii-ack-context JSON: {\"request_code\": \"…\"}")
     print("  POST /riporta-sospeso JSON: {\"request_code\": \"…\"}")
     print("  POST /mockup-cp1/load   JSON: {\"id_risposta_testata\": 802}")
     print("  POST /mockup-cp1/update JSON: {\"id_risposta_testata\": 802, \"fields\": {…}}")

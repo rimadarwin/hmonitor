@@ -1,6 +1,8 @@
 /**
  * @author Maurizio di Sabato <maurizio.disabato@xcconsulting.it>
  * @description Popup/side panel: date, switch ATOA/FILE, flussi Heroku con populate da amc.request
+ * @modified 29.09.2026 - MDS | ES1 ACK: URL da base Heroku, correlation_id da /dlsii-ack-context
+ * @modified 29.09.2026 - MDS | Flusso ELE ES1 ACK (POST /dlsii/ackFileFlow, recovery 0050)
  * @modified 29.09.2026 - MDS | Flusso GAS VTG 150 (inboundflow, evento 09T)
  * @modified 28.09.2026 - MDS | Sync automatico input → corpo JSON su tutti i flussi
  * @modified 28.09.2026 - MDS | Flussi ELE ES1 100 e ELE ES1 150 (inboundflow, struttura righe)
@@ -15,6 +17,7 @@ const DEFAULT_HEROKU_BASE =
   "https://gh-manage-co-dev-int-a0c1c0ddf5f3.herokuapp.com";
 /** Path fissi per flusso (base URL da Impostazioni). */
 const PATH_DLSII_INBOUND = "/dlsii/inboundflow";
+const PATH_DLSII_ACK_FILE = "/dlsii/ackFileFlow";
 const PATH_SEND_ESITI = "/managecomunication/send-esiti";
 const PATH_BATCH_INVOKE = "/batch/invoke";
 
@@ -116,6 +119,7 @@ function normalizeHerokuBase(raw) {
   let u = (raw || "").trim().replace(/\/+$/, "");
   if (!u) return DEFAULT_HEROKU_BASE;
   u = u.replace(/\/dlsii\/inboundflow\/?$/i, "");
+  u = u.replace(/\/dlsii\/ackFileFlow\/?$/i, "");
   u = u.replace(/\/managecomunication\/send-esiti\/?$/i, "");
   u = u.replace(/\/batch\/invoke\/?$/i, "");
   return u.replace(/\/+$/, "") || DEFAULT_HEROKU_BASE;
@@ -141,6 +145,11 @@ async function buildHerokuUrl(path) {
 /** VT1 / WP1 / SG1 GAS → /dlsii/inboundflow */
 async function getVt1Url() {
   return buildHerokuUrl(PATH_DLSII_INBOUND);
+}
+
+/** ELE ES1 ACK recovery → /dlsii/ackFileFlow */
+async function getEleEs1AckUrl() {
+  return buildHerokuUrl(PATH_DLSII_ACK_FILE);
 }
 
 /** SG1 DTMS → /managecomunication/send-esiti */
@@ -226,6 +235,32 @@ async function loadDefaultEleEs1150Payload() {
   const res = await fetch(chrome.runtime.getURL("ele-es1-150-default-payload.json"));
   if (!res.ok) throw new Error("Impossibile caricare il template ELE ES1 150 JSON.");
   return res.json();
+}
+
+async function loadDefaultEleEs1AckPayload() {
+  const res = await fetch(chrome.runtime.getURL("ele-es1-ack-default-payload.json"));
+  if (!res.ok) throw new Error("Impossibile caricare il template ELE ES1 ACK JSON.");
+  return res.json();
+}
+
+function applyEleEs1AckFieldsToPayload(payload, values) {
+  const p = typeof payload === "string" ? JSON.parse(payload) : payload;
+  const hdr = p?.prestazione?.header;
+  if (hdr) {
+    if (values.correlationId != null) {
+      hdr.correlationId = String(values.correlationId).trim();
+    }
+    if (values.esito != null) hdr.esito = values.esito;
+    if (values.descrizioneEsito != null) {
+      hdr.descrizioneEsito = values.descrizioneEsito;
+    }
+  }
+  const fields = getPrestazioneFieldsArray(p);
+  setFieldsFromMap(fields, {
+    COD_PRAT_UTENTE: values.codPratUtente || "",
+    COD_POD: values.codPod || "",
+  });
+  return p;
 }
 
 function applyEleEs1100FieldsToPayload(payload, values) {
@@ -1327,6 +1362,7 @@ function showScreen(name) {
   const vt1 = document.getElementById("screenVt1");
   const eleAv1 = document.getElementById("screenEleAv1");
   const eleEs1100 = document.getElementById("screenEleEs1100");
+  const eleEs1Ack = document.getElementById("screenEleEs1Ack");
   const eleEs1150 = document.getElementById("screenEleEs1150");
   const wp1 = document.getElementById("screenWp1");
   const gasA01 = document.getElementById("screenGasA01");
@@ -1344,6 +1380,7 @@ function showScreen(name) {
   if (mockupCp1) mockupCp1.classList.toggle("hidden", name !== "mockupCp1");
   if (eleAv1) eleAv1.classList.toggle("hidden", name !== "eleAv1");
   if (eleEs1100) eleEs1100.classList.toggle("hidden", name !== "eleEs1100");
+  if (eleEs1Ack) eleEs1Ack.classList.toggle("hidden", name !== "eleEs1Ack");
   if (eleEs1150) eleEs1150.classList.toggle("hidden", name !== "eleEs1150");
   vt1.classList.toggle("hidden", name !== "vt1");
   if (wp1) wp1.classList.toggle("hidden", name !== "wp1");
@@ -1383,6 +1420,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const goEleAv1 = document.getElementById("goEleAv1");
   const goEleEs1100 = document.getElementById("goEleEs1100");
   const goEleEs1150 = document.getElementById("goEleEs1150");
+  const goEleEs1Ack = document.getElementById("goEleEs1Ack");
   const goVt1 = document.getElementById("goVt1");
   const goWp1 = document.getElementById("goWp1");
   const goGasA01 = document.getElementById("goGasA01");
@@ -1473,6 +1511,21 @@ document.addEventListener("DOMContentLoaded", () => {
   const statusEleEs1100 = document.getElementById("statusEleEs1100");
   const logEleEs1100 = document.getElementById("logEleEs1100");
   const backFromEleEs1100 = document.getElementById("backFromEleEs1100");
+
+  const scrapeAgainEleEs1Ack = document.getElementById("scrapeAgainEleEs1Ack");
+  const eleEs1AckCorrelationId = document.getElementById("eleEs1AckCorrelationId");
+  const eleEs1AckCodPrat = document.getElementById("eleEs1AckCodPrat");
+  const eleEs1AckPod = document.getElementById("eleEs1AckPod");
+  const eleEs1AckEsito = document.getElementById("eleEs1AckEsito");
+  const eleEs1AckDescrEsito = document.getElementById("eleEs1AckDescrEsito");
+  const eleEs1AckCookie = document.getElementById("eleEs1AckCookie");
+  const eleEs1AckDbJson = document.getElementById("eleEs1AckDbJson");
+  const eleEs1AckJson = document.getElementById("eleEs1AckJson");
+  const eleEs1AckApplyFields = document.getElementById("eleEs1AckApplyFields");
+  const eleEs1AckSend = document.getElementById("eleEs1AckSend");
+  const statusEleEs1Ack = document.getElementById("statusEleEs1Ack");
+  const logEleEs1Ack = document.getElementById("logEleEs1Ack");
+  const backFromEleEs1Ack = document.getElementById("backFromEleEs1Ack");
 
   const scrapeAgainEleEs1150 = document.getElementById("scrapeAgainEleEs1150");
   const eleEs1150Documentkey = document.getElementById("eleEs1150Documentkey");
@@ -1677,6 +1730,8 @@ document.addEventListener("DOMContentLoaded", () => {
     document.getElementById("openOptionsEleEs1100Auth"),
     document.getElementById("openOptionsEleEs1150"),
     document.getElementById("openOptionsEleEs1150Auth"),
+    document.getElementById("openOptionsEleEs1Ack"),
+    document.getElementById("openOptionsEleEs1AckAuth"),
     document.getElementById("openOptionsWp1"),
     document.getElementById("openOptionsWp1Auth"),
     document.getElementById("openOptionsGasA01"),
@@ -1762,6 +1817,27 @@ document.addEventListener("DOMContentLoaded", () => {
     eleEs1100DesEsito.value = top.desEsitoVerificaAmm || "1";
     eleEs1100Coderr.value = top.coderrAeeg || "";
     eleEs1100Annotazioni.value = top.extAnnotazioni || "";
+  }
+
+  function collectEleEs1AckFormValues() {
+    return {
+      correlationId: eleEs1AckCorrelationId.value.trim(),
+      codPratUtente: eleEs1AckCodPrat.value.trim(),
+      codPod: eleEs1AckPod.value.trim(),
+      esito: eleEs1AckEsito.value.trim() || "OK",
+      descrizioneEsito:
+        eleEs1AckDescrEsito.value.trim() || "Scrittura SFTP OK",
+    };
+  }
+
+  function fillEleEs1AckInputsFromTop(top) {
+    if (top.correlationId) {
+      eleEs1AckCorrelationId.value = top.correlationId;
+    }
+    eleEs1AckCodPrat.value = top.codPratUtente || top.requestCode || "";
+    eleEs1AckPod.value = top.codPod || top.pod || "";
+    eleEs1AckEsito.value = top.esito || "OK";
+    eleEs1AckDescrEsito.value = top.descrizioneEsito || "Scrittura SFTP OK";
   }
 
   function collectEleEs1150FormValues() {
@@ -2098,6 +2174,14 @@ document.addEventListener("DOMContentLoaded", () => {
     await populateEleEs1150Screen(true);
   });
 
+  goEleEs1Ack.addEventListener("click", async () => {
+    showScreen("eleEs1Ack");
+    logEleEs1Ack.classList.add("hidden");
+    logEleEs1Ack.textContent = "";
+    setStatus(statusEleEs1Ack, "Caricamento…", "");
+    await populateEleEs1AckScreen(true);
+  });
+
   goWp1.addEventListener("click", async () => {
     showScreen("wp1");
     logWp1.classList.add("hidden");
@@ -2177,6 +2261,7 @@ document.addEventListener("DOMContentLoaded", () => {
   backFromVt1.addEventListener("click", () => showScreen("home"));
   backFromEleAv1.addEventListener("click", () => showScreen("home"));
   backFromEleEs1100.addEventListener("click", () => showScreen("home"));
+  backFromEleEs1Ack.addEventListener("click", () => showScreen("home"));
   backFromEleEs1150.addEventListener("click", () => showScreen("home"));
   backFromWp1.addEventListener("click", () => showScreen("home"));
   backFromGasA01.addEventListener("click", () => showScreen("home"));
@@ -2556,6 +2641,42 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
+  async function populateEleEs1AckScreen(_doScrape) {
+    try {
+      setStatus(statusEleEs1Ack, "Carico dati da amc.request e dlsii_messages…", "");
+      const basePayload = await loadDefaultEleEs1AckPayload();
+      const payload = deepClone(basePayload);
+      const ctx = await loadRequestContextForFlow();
+      const v = ctx.values;
+      const dlsii = await fetchDlsiiAckContextFromApi(v.requestCode);
+      if (!dlsii.ok) {
+        throw new Error(dlsii.error || "Impossibile leggere amc.dlsii_messages.");
+      }
+      setDbJsonBox(eleEs1AckDbJson, {
+        amc_request: ctx.db,
+        dlsii_message: dlsii.dlsii,
+      });
+      fillEleEs1AckInputsFromTop({
+        correlationId: dlsii.correlation_id || "",
+        requestCode: v.requestCode,
+        codPratUtente: v.requestCode,
+        codPod: v.pod || pickFlat(v.flat, "POD", "EXT_POD", "COD_POD"),
+      });
+      applyEleEs1AckFieldsToPayload(payload, collectEleEs1AckFormValues());
+      const sec = await getVt1LocalForAuth();
+      eleEs1AckCookie.value = sec.vt1Cookie || "";
+      eleEs1AckJson.value = JSON.stringify(payload, null, 2);
+      setStatus(
+        statusEleEs1Ack,
+        `DB ok · correlation_id · ${v.requestCode}`,
+        "ok"
+      );
+    } catch (e) {
+      setDbJsonBox(eleEs1AckDbJson, { ok: false, error: String(e.message || e) });
+      setStatus(statusEleEs1Ack, String(e.message || e), "err");
+    }
+  }
+
   async function populateEleEs1150Screen(_doScrape) {
     try {
       setStatus(statusEleEs1150, "Carico dati da amc.request…", "");
@@ -2734,6 +2855,11 @@ document.addEventListener("DOMContentLoaded", () => {
     scrapeAgainEleEs1100.disabled = false;
   });
 
+  scrapeAgainEleEs1Ack.addEventListener("click", async () => {
+    scrapeAgainEleEs1Ack.disabled = true;
+    await populateEleEs1AckScreen(true);
+    scrapeAgainEleEs1Ack.disabled = false;
+  });
 
   eleEs1100Send.addEventListener("click", async () => {
     logEleEs1100.classList.add("hidden");
@@ -2793,6 +2919,72 @@ document.addEventListener("DOMContentLoaded", () => {
       setStatus(statusEleEs1100, String(e.message || e), "err");
     } finally {
       eleEs1100Send.disabled = false;
+    }
+  });
+
+  eleEs1AckSend.addEventListener("click", async () => {
+    logEleEs1Ack.classList.add("hidden");
+    logEleEs1Ack.textContent = "";
+    const authLocal = await getVt1LocalForAuth();
+    const authBuilt = buildVt1AuthorizationHeader(authLocal);
+    if (!authBuilt.ok) {
+      setStatus(statusEleEs1Ack, authBuilt.message, "err");
+      return;
+    }
+    let bodyObj;
+    try {
+      bodyObj = JSON.parse(eleEs1AckJson.value);
+    } catch (e) {
+      setStatus(statusEleEs1Ack, `JSON non valido: ${e.message}`, "err");
+      return;
+    }
+    const ackValues = collectEleEs1AckFormValues();
+    if (!ackValues.correlationId) {
+      setStatus(statusEleEs1Ack, "correlationId mancante: esegui Refresh dati.", "err");
+      return;
+    }
+    applyEleEs1AckFieldsToPayload(bodyObj, ackValues);
+    const bodyStr = JSON.stringify(bodyObj);
+    eleEs1AckJson.value = JSON.stringify(bodyObj, null, 2);
+    const endpoint = await getEleEs1AckUrl();
+    eleEs1AckSend.disabled = true;
+    setStatus(statusEleEs1Ack, "Invio in corso…", "");
+    try {
+      console.debug("[ELE ES1 ACK] POST", endpoint);
+      const headers = {
+        "Content-Type": "application/json",
+        Authorization: authBuilt.value,
+      };
+      const cookie = eleEs1AckCookie.value.trim();
+      if (cookie) headers.Cookie = cookie;
+      const res = await fetch(endpoint, {
+        method: "POST",
+        headers,
+        body: bodyStr,
+      });
+      const textRes = await res.text();
+      let pretty = textRes;
+      try {
+        pretty = JSON.stringify(JSON.parse(textRes), null, 2);
+      } catch {
+        /* testo puro */
+      }
+      if (!res.ok) {
+        setStatus(statusEleEs1Ack, `HTTP ${res.status}`, "err");
+        logEleEs1Ack.textContent = pretty;
+        logEleEs1Ack.classList.remove("hidden");
+        return;
+      }
+      setStatus(statusEleEs1Ack, `OK · HTTP ${res.status}`, "ok");
+      if (pretty) {
+        logEleEs1Ack.textContent = pretty;
+        logEleEs1Ack.classList.remove("hidden");
+      }
+      await chrome.storage.local.set({ vt1Cookie: cookie });
+    } catch (e) {
+      setStatus(statusEleEs1Ack, String(e.message || e), "err");
+    } finally {
+      eleEs1AckSend.disabled = false;
     }
   });
 
@@ -4060,6 +4252,20 @@ document.addEventListener("DOMContentLoaded", () => {
         eleEs1150Json,
         (p) => applyEleEs1150FieldsToPayload(p, collectEleEs1150FormValues()),
         statusEleEs1150,
+        "JSON aggiornato dai campi.",
+        opts
+      ),
+  });
+
+  wireLiveJsonSync({
+    screenId: "screenEleEs1Ack",
+    jsonEl: eleEs1AckJson,
+    applyBtn: eleEs1AckApplyFields,
+    syncFn: (opts) =>
+      syncJsonFromFields(
+        eleEs1AckJson,
+        (p) => applyEleEs1AckFieldsToPayload(p, collectEleEs1AckFormValues()),
+        statusEleEs1Ack,
         "JSON aggiornato dai campi.",
         opts
       ),

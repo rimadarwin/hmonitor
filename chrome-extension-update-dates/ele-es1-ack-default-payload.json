@@ -1,0 +1,33 @@
+{
+  "prestazione": {
+    "header": {
+      "distributore": "00225170687",
+      "venditore": "02221101203",
+      "causale": "S01",
+      "flusso": "0050",
+      "user": "postman_ack_recovery",
+      "servizio": null,
+      "idFileModello": null,
+      "estensione": "CSV",
+      "righeTestata": "1",
+      "esito": "OK",
+      "descrizioneEsito": "Scrittura SFTP OK",
+      "evento": null,
+      "nomeMessaggio": "S01_0050_EE_FOUR",
+      "correlationId": ""
+    },
+    "template": null,
+    "righe": [
+      {
+        "fields": [
+          { "field": "COD_SERVIZIO", "value": "S01" },
+          { "field": "COD_FLUSSO", "value": "0050" },
+          { "field": "PIVA_MITT", "value": "02221101203" },
+          { "field": "PIVA_DEST", "value": "00225170687" },
+          { "field": "COD_PRAT_UTENTE", "value": "" },
+          { "field": "COD_POD", "value": "" }
+        ]
+      }
+    ]
+  }
+}

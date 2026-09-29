@@ -3,6 +3,7 @@
 <!--
   @author Maurizio di Sabato <maurizio.disabato@xcconsulting.it>
   @description Side panel estensione Hera - avanzamento pratiche
+  @modified 29.09.2026 - MDS | ES1 ACK: correlation_id da API /dlsii-ack-context
   @modified 29.09.2026 - MDS | Flusso GAS VTG 150 (inboundflow, evento 09T)
   @modified 28.09.2026 - MDS | Rimuove titolo Operazioni dalla home
   @modified 28.09.2026 - MDS | Flussi ELE ES1 100 e ELE ES1 150 (inboundflow)
@@ -28,6 +29,7 @@
       <button type="button" id="goEleAv1" class="choice accent">ELE AV1 150</button>
       <button type="button" id="goEleEs1100" class="choice accent">ELE ES1 100</button>
       <button type="button" id="goEleEs1150" class="choice accent">ELE ES1 150</button>
+      <button type="button" id="goEleEs1Ack" class="choice accent">ELE ES1 ACK</button>
       <button type="button" id="goSe1Dtec" class="choice accent">ELE SE1 DTEC</button>
       <button type="button" id="goVt1" class="choice accent">ELE VT1 150</button>
       <button type="button" id="goWp1" class="choice accent">ELE WP1 150</button>
@@ -261,6 +263,73 @@
       <button type="button" id="backFromEleEs1100" class="linkish">← Indietro</button>
       <p class="footer tight">
         <a href="#" id="openOptionsEleEs1100">Impostazioni</a>
+      </p>
+    </section>
+
+    <!-- ELE ES1 ACK → /dlsii/ackFileFlow -->
+    <section id="screenEleEs1Ack" class="hidden">
+      <h1>ELE ES1 ACK</h1>
+      <p class="hint">
+        Recovery ack SFTP per <code>S01.0050</code> · POST
+        <code>/dlsii/ackFileFlow</code> (base Heroku da Impostazioni).
+        <code>correlationId</code> dall’ultimo messaggio 0050 INVIATO in DB.
+      </p>
+      <button type="button" id="scrapeAgainEleEs1Ack" class="secondary full">Refresh dati</button>
+      <label class="field">
+        <span>correlationId (da amc.dlsii_messages)</span>
+        <input
+          type="text"
+          id="eleEs1AckCorrelationId"
+          autocomplete="off"
+          spellcheck="false"
+          readonly
+        />
+      </label>
+      <label class="field">
+        <span>COD_PRAT_UTENTE (request_code)</span>
+        <input type="text" id="eleEs1AckCodPrat" autocomplete="off" spellcheck="false" />
+      </label>
+      <label class="field">
+        <span>COD_POD</span>
+        <input type="text" id="eleEs1AckPod" autocomplete="off" spellcheck="false" />
+      </label>
+      <label class="field">
+        <span>header.esito</span>
+        <input type="text" id="eleEs1AckEsito" autocomplete="off" spellcheck="false" value="OK" />
+      </label>
+      <label class="field">
+        <span>header.descrizioneEsito</span>
+        <input
+          type="text"
+          id="eleEs1AckDescrEsito"
+          autocomplete="off"
+          spellcheck="false"
+          value="Scrittura SFTP OK"
+        />
+      </label>
+      <p class="hint vt1-auth-hint">
+        <strong>Authorization</strong> e cookie: stesse impostazioni VT1 in
+        <a href="#" id="openOptionsEleEs1AckAuth">Impostazioni</a>.
+      </p>
+      <label class="field">
+        <span>Cookie (opzionale)</span>
+        <input type="text" id="eleEs1AckCookie" autocomplete="off" spellcheck="false" />
+      </label>
+      <label class="field">
+        <span>Dati da amc.request (id_request + input)</span>
+        <textarea id="eleEs1AckDbJson" rows="6" spellcheck="false" readonly></textarea>
+      </label>
+      <label class="field">
+        <span>Corpo JSON</span>
+        <textarea id="eleEs1AckJson" rows="12" spellcheck="false"></textarea>
+      </label>
+      <button type="button" id="eleEs1AckApplyFields" class="secondary full">Aggiorna JSON dai campi sopra</button>
+      <button type="button" id="eleEs1AckSend" class="primary">Invia richiesta</button>
+      <div id="statusEleEs1Ack" class="status" aria-live="polite"></div>
+      <pre id="logEleEs1Ack" class="log hidden"></pre>
+      <button type="button" id="backFromEleEs1Ack" class="linkish">← Indietro</button>
+      <p class="footer tight">
+        <a href="#" id="openOptionsEleEs1Ack">Impostazioni</a>
       </p>
     </section>
 

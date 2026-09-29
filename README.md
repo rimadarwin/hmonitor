@@ -93,6 +93,22 @@ Switch di `amc.request.canale_com` tra `ATOA` e `FILE` in base al valore corrent
 
 Risposta con log `changes` (prima/dopo), stesso formato di `/update`.
 
+### `POST /request-data`
+
+Legge `id_request` e `input` da `amc.request` (populate flussi estensione).
+
+```json
+{ "request_code": "A00005052536" }
+```
+
+### `POST /dlsii-ack-context`
+
+Ultimo messaggio DLSII 0050 `INVIATO` con `correlation_id` (flusso **ELE ES1 ACK**).
+
+```json
+{ "request_code": "A00005052536" }
+```
+
 ### `POST /riporta-sospeso`
 
 Su `amc.sap_messages` per il `request_code`: `message_state = 'SOSPESO'`, `attiva_sap = ''`.

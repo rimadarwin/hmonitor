@@ -1,6 +1,7 @@
 /**
  * @author Maurizio di Sabato <maurizio.disabato@xcconsulting.it>
  * @description Recupero e mapping dati da amc.request (API /request-data) per i body dei flussi
+ * @modified 29.09.2026 - MDS | API /dlsii-ack-context (correlation_id per ES1 ACK)
  * @modified 28.09.2026 - MDS | Merge scrape UI + alias COD_FISCALE/PIVA/Codice Pratica SII
  * @modified 23.09.2026 - MDS | Flatten input + mapping campi comuni (POD/PDR, RIF_EXT, potenze, ecc.)
  */
@@ -33,6 +34,37 @@ async function fetchRequestDataFromApi(requestCode) {
     request_code: data.request_code || code,
     id_request: data.id_request,
     input: data.input,
+  };
+}
+
+/** Chiama POST /dlsii-ack-context (messaggio 0050 INVIATO + correlation_id). */
+async function fetchDlsiiAckContextFromApi(requestCode) {
+  const code = (requestCode || "").trim();
+  if (!code) {
+    return { ok: false, error: "Codice richiesta mancante." };
+  }
+  const base = await getApiBase();
+  const res = await fetch(`${base}/dlsii-ack-context`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ request_code: code }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok || !data.ok) {
+    return {
+      ok: false,
+      request_code: code,
+      error:
+        data.error ||
+        data.message ||
+        `dlsii-ack-context HTTP ${res.status}`,
+    };
+  }
+  return {
+    ok: true,
+    request_code: data.request_code || code,
+    correlation_id: data.correlation_id,
+    dlsii: data.dlsii,
   };
 }
 
