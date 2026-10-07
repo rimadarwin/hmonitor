@@ -1,16 +1,17 @@
-/**
- * @author Maurizio di Sabato <maurizio.disabato@xcconsulting.it>
+﻿/**
+ * @author MG
  * @description Popup/side panel: date, switch ATOA/FILE, flussi Heroku con populate da amc.request
- * @modified 29.09.2026 - MDS | ES1 100 → inboundFileFlow, payload CSV campi numerici
- * @modified 29.09.2026 - MDS | ES1 ACK: URL da base Heroku, correlation_id da /dlsii-ack-context
- * @modified 29.09.2026 - MDS | Flusso ELE ES1 ACK (POST /dlsii/ackFileFlow, recovery 0050)
- * @modified 29.09.2026 - MDS | Flusso GAS VTG 150 (inboundflow, evento 09T)
- * @modified 28.09.2026 - MDS | Sync automatico input → corpo JSON su tutti i flussi
- * @modified 28.09.2026 - MDS | Flussi ELE ES1 100 e ELE ES1 150 (inboundflow, struttura righe)
- * @modified 28.09.2026 - MDS | Scrape CF/P.IVA/Codice Pratica SII con alias etichette UI
- * @modified 24.09.2026 - MDS | Schermata Mockup CP1 (load/update simulatore_risposta_campi)
- * @modified 23.09.2026 - MDS | Schermata Riporta in sospeso (POST /riporta-sospeso)
- * @modified 23.09.2026 - MDS | Populate flussi da amc.request (id_request + input) invece dello scrape
+ * @modified 29.09.2026 - MG | ES1 150 → inboundFileFlow, payload CSV S01.0150
+ * @modified 29.09.2026 - MG | ES1 100 → inboundFileFlow, payload CSV campi numerici
+ * @modified 29.09.2026 - MG | ES1 ACK: URL da base Heroku, correlation_id da /dlsii-ack-context
+ * @modified 29.09.2026 - MG | Flusso ELE ES1 ACK (POST /dlsii/ackFileFlow, recovery 0050)
+ * @modified 29.09.2026 - MG | Flusso GAS VTG 150 (inboundflow, evento 09T)
+ * @modified 28.09.2026 - MG | Sync automatico input → corpo JSON su tutti i flussi
+ * @modified 28.09.2026 - MG | Flussi ELE ES1 100 e ELE ES1 150 (inboundflow, struttura righe)
+ * @modified 28.09.2026 - MG | Scrape CF/P.IVA/Codice Pratica SII con alias etichette UI
+ * @modified 24.09.2026 - MG | Schermata Mockup CP1 (load/update simulatore_risposta_campi)
+ * @modified 23.09.2026 - MG | Schermata Riporta in sospeso (POST /riporta-sospeso)
+ * @modified 23.09.2026 - MG | Populate flussi da amc.request (id_request + input) invece dello scrape
  */
 /** Base API senza :porta su Render (HTTPS = 443). Per locale usa Impostazioni → 127.0.0.1:8765. */
 const DEFAULT_API = "https://hmonitor-uhk9.onrender.com";
@@ -150,9 +151,13 @@ async function getVt1Url() {
   return buildHerokuUrl(PATH_DLSII_INBOUND);
 }
 
-/** ELE ES1 100 (FILE) → /dlsii/inboundFileFlow */
-async function getEleEs1100Url() {
+/** ELE ES1 100/150 (FILE) → /dlsii/inboundFileFlow */
+async function getEleEs1InboundFileUrl() {
   return buildHerokuUrl(PATH_DLSII_INBOUND_FILE);
+}
+
+async function getEleEs1100Url() {
+  return getEleEs1InboundFileUrl();
 }
 
 /** ELE ES1 ACK recovery → /dlsii/ackFileFlow */
@@ -296,27 +301,51 @@ function applyEleEs1100FieldsToPayload(payload, values) {
   return p;
 }
 
+function pivaMittenteForVenditore(venditoreCodice) {
+  const code = (venditoreCodice || "").trim();
+  if (code === "13V0000170") return "00997630322";
+  if (code === "13V0000000") return "02221101203";
+  return DEFAULT_PIVA_MITT;
+}
+
 function applyEleEs1150FieldsToPayload(payload, values) {
   const p = typeof payload === "string" ? JSON.parse(payload) : payload;
+  const hdr = p?.prestazione?.header;
+  if (hdr) {
+    hdr.evento = "0S2";
+    hdr.nomeMessaggio = "S01_0150";
+    if (values.venditoreCodice) hdr.venditore = values.venditoreCodice;
+    if (values.distributoreCodice) hdr.distributore = values.distributoreCodice;
+  }
+  const pratica = (values.requestCode || values.documentkey || "").trim();
+  const praticaDl =
+    (values.codPraticaDl || values.rif_ext || "").trim() ||
+    (pratica ? `${pratica}_DL` : "");
+  const nome = values.extNome || values.zNome || "";
+  const cognome = values.extCognome || values.zCognome || "";
   const fields = getPrestazioneFieldsArray(p);
   setFieldsFromMap(fields, {
-    DOCUMENTKEY: values.documentkey,
-    RIF_EXT: values.rif_ext,
-    COD_CONTR_DISP: values.codContrDisp || "",
-    EXT_STATO_RICHIESTA: "1",
-    EXT_DT_DECOR_D: toDDMMYYYYForAv1(values.extDtDecorD),
-    EXT_POD: values.pod || "",
-    COGNOME: values.extCognome || values.zCognome || "",
-    NOME: values.extNome || values.zNome || "",
-    RAGIONE_SOCIALE: values.extRagsoc || values.zRagsoc || "",
-    COD_FISCALE: values.extCodFiscale || values.zCodiceFiscale || "",
-    PIVA: values.extPartitaIva || values.zPartitaIva || "",
-    EXT_POT_IMP: values.extPotImp || "3",
-    EXT_POT_DISP: values.extPotDisp || "3.3",
-    EXT_TENS_ALIM: values.extTensAlim || "120",
-    EXT_OPZ_TARIFFA: values.extOpzTariffa || "ETAA1M00F1",
-    EXT_TIPO_MISURATORE: values.extTipoMisuratore || "CE",
-    EXT_ANNOTAZIONI: values.extAnnotazioni || "",
+    1: "S01",
+    2: "0150",
+    3: values.pivaMitt || pivaMittenteForVenditore(values.venditoreCodice),
+    4: values.codContrDisp || "",
+    5: values.pivaDest || "",
+    6: pratica,
+    7: praticaDl,
+    8: "1",
+    9: toDDMMYYYYForAv1(values.extDtDecorD),
+    10: values.pod || "",
+    11: nome,
+    12: cognome,
+    13: values.extRagsoc || values.zRagsoc || "",
+    14: values.extCodFiscale || values.zCodiceFiscale || "",
+    15: values.extPartitaIva || values.zPartitaIva || "",
+    20: values.extTipoMisuratore || "CE",
+    51: values.extPotImp || "6",
+    52: values.extPotDisp || "6.6",
+    54: values.extTensFase || "BT Monofase",
+    55: values.extTensAlim || "220",
+    59: values.extOpzTariffa || "ETAB1I00C1",
   });
   return p;
 }
@@ -1379,6 +1408,7 @@ function showScreen(name) {
   const canale = document.getElementById("screenCanale");
   const sospeso = document.getElementById("screenSospeso");
   const mockupCp1 = document.getElementById("screenMockupCp1");
+  const se1Dd = document.getElementById("screenSe1Dd");
   const vt1 = document.getElementById("screenVt1");
   const eleAv1 = document.getElementById("screenEleAv1");
   const eleEs1100 = document.getElementById("screenEleEs1100");
@@ -1398,6 +1428,7 @@ function showScreen(name) {
   if (canale) canale.classList.toggle("hidden", name !== "canale");
   if (sospeso) sospeso.classList.toggle("hidden", name !== "sospeso");
   if (mockupCp1) mockupCp1.classList.toggle("hidden", name !== "mockupCp1");
+  if (se1Dd) se1Dd.classList.toggle("hidden", name !== "se1Dd");
   if (eleAv1) eleAv1.classList.toggle("hidden", name !== "eleAv1");
   if (eleEs1100) eleEs1100.classList.toggle("hidden", name !== "eleEs1100");
   if (eleEs1Ack) eleEs1Ack.classList.toggle("hidden", name !== "eleEs1Ack");
@@ -1437,6 +1468,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const goCanale = document.getElementById("goCanale");
   const goSospeso = document.getElementById("goSospeso");
   const goMockupCp1 = document.getElementById("goMockupCp1");
+  const goSe1Dd = document.getElementById("goSe1Dd");
   const goEleAv1 = document.getElementById("goEleAv1");
   const goEleEs1100 = document.getElementById("goEleEs1100");
   const goEleEs1150 = document.getElementById("goEleEs1150");
@@ -1479,6 +1511,28 @@ document.addEventListener("DOMContentLoaded", () => {
   const statusMockupCp1 = document.getElementById("statusMockupCp1");
   const logMockupCp1 = document.getElementById("logMockupCp1");
   const backFromMockupCp1 = document.getElementById("backFromMockupCp1");
+
+  const se1DdFilterProcesso = document.getElementById("se1DdFilterProcesso");
+  const se1DdFilterVenditore = document.getElementById("se1DdFilterVenditore");
+  const se1DdFilterCampo = document.getElementById("se1DdFilterCampo");
+  const se1DdSearchBtn = document.getElementById("se1DdSearchBtn");
+  const se1DdNuovoBtn = document.getElementById("se1DdNuovoBtn");
+  const se1DdResults = document.getElementById("se1DdResults");
+  const se1DdEditor = document.getElementById("se1DdEditor");
+  const se1DdEditId = document.getElementById("se1DdEditId");
+  const se1DdEditProcesso = document.getElementById("se1DdEditProcesso");
+  const se1DdEditVenditore = document.getElementById("se1DdEditVenditore");
+  const se1DdEditNomeCampo = document.getElementById("se1DdEditNomeCampo");
+  const se1DdEditProgressivo = document.getElementById("se1DdEditProgressivo");
+  const se1DdEditValoreRichiesta = document.getElementById("se1DdEditValoreRichiesta");
+  const se1DdEditValoreDl = document.getElementById("se1DdEditValoreDl");
+  const se1DdSaveBtn = document.getElementById("se1DdSaveBtn");
+  const se1DdCancelEditBtn = document.getElementById("se1DdCancelEditBtn");
+  const statusSe1Dd = document.getElementById("statusSe1Dd");
+  const logSe1Dd = document.getElementById("logSe1Dd");
+  const backFromSe1Dd = document.getElementById("backFromSe1Dd");
+  let se1DdEditMode = "none";
+  let se1DdLastRows = [];
 
   const scrapeAgain = document.getElementById("scrapeAgain");
   const vt1Documentkey = document.getElementById("vt1Documentkey");
@@ -1742,6 +1796,7 @@ document.addEventListener("DOMContentLoaded", () => {
     document.getElementById("openOptionsCanale"),
     document.getElementById("openOptionsSospeso"),
     document.getElementById("openOptionsMockupCp1"),
+    document.getElementById("openOptionsSe1Dd"),
     document.getElementById("openOptionsVt1"),
     document.getElementById("openOptionsVt1Auth"),
     document.getElementById("openOptionsEleAv1"),
@@ -1870,31 +1925,49 @@ document.addEventListener("DOMContentLoaded", () => {
     eleEs1AckDescrEsito.value = top.descrizioneEsito || "Scrittura SFTP OK";
   }
 
+  let eleEs1150VenditoreCache = "";
+  let eleEs1150DistributoreCache = "";
+  let eleEs1150PivaDestCache = "";
+  let eleEs1150TensFaseCache = "BT Monofase";
+
   function collectEleEs1150FormValues() {
+    const requestCode = eleEs1150Documentkey.value.trim();
     return {
-      documentkey: eleEs1150Documentkey.value.trim(),
+      requestCode,
+      documentkey: requestCode,
+      codPraticaDl: eleEs1150RifExt.value.trim(),
       rif_ext: eleEs1150RifExt.value.trim(),
       pod: eleEs1150Pod.value.trim(),
       extDtDecorD: eleEs1150ExtDtDecor.value.trim() || todayDDMMYYYY(),
       codContrDisp: eleEs1150CodContrDisp.value.trim(),
       extNome: eleEs1150Nome.value.trim(),
       extCognome: eleEs1150Cognome.value.trim(),
+      zNome: eleEs1150Nome.value.trim(),
+      zCognome: eleEs1150Cognome.value.trim(),
       extRagsoc: eleEs1150Ragsoc.value.trim(),
+      zRagsoc: eleEs1150Ragsoc.value.trim(),
       extCodFiscale: eleEs1150Cf.value.trim(),
-      extPartitaIva: eleEs1150Piva.value.trim(),
       zCodiceFiscale: eleEs1150Cf.value.trim(),
+      extPartitaIva: eleEs1150Piva.value.trim(),
       zPartitaIva: eleEs1150Piva.value.trim(),
-      extPotImp: eleEs1150PotImp.value.trim() || "3",
-      extPotDisp: eleEs1150PotDisp.value.trim() || "3.3",
-      extTensAlim: eleEs1150TensAlim.value.trim() || "120",
-      extOpzTariffa: eleEs1150OpzTariffa.value.trim() || "ETAA1M00F1",
+      extPotImp: eleEs1150PotImp.value.trim() || "6",
+      extPotDisp: eleEs1150PotDisp.value.trim() || "6.6",
+      extTensAlim: eleEs1150TensAlim.value.trim() || "220",
+      extTensFase: eleEs1150TensFaseCache,
+      extOpzTariffa: eleEs1150OpzTariffa.value.trim() || "ETAB1I00C1",
       extTipoMisuratore: eleEs1150TipoMis.value.trim() || "CE",
+      pivaMitt: pivaMittenteForVenditore(eleEs1150VenditoreCache),
+      pivaDest: eleEs1150PivaDestCache,
+      venditoreCodice: eleEs1150VenditoreCache,
+      distributoreCodice: eleEs1150DistributoreCache,
     };
   }
 
   function fillEleEs1150InputsFromTop(top) {
-    eleEs1150Documentkey.value = top.documentkey || "";
-    eleEs1150RifExt.value = top.rif_ext || "";
+    const code = top.requestCode || top.documentkey || "";
+    eleEs1150Documentkey.value = code;
+    eleEs1150RifExt.value =
+      top.codPraticaDl || top.rif_ext || (code ? `${code}_DL` : "");
     eleEs1150Pod.value = top.pod || "";
     eleEs1150ExtDtDecor.value = top.extDtDecorD || todayDDMMYYYY();
     eleEs1150CodContrDisp.value = top.codContrDisp || "";
@@ -1903,10 +1976,10 @@ document.addEventListener("DOMContentLoaded", () => {
     eleEs1150Ragsoc.value = top.extRagsoc || top.zRagsoc || "";
     eleEs1150Cf.value = top.extCodFiscale || top.zCodiceFiscale || "";
     eleEs1150Piva.value = top.extPartitaIva || top.zPartitaIva || "";
-    eleEs1150PotImp.value = top.extPotImp || "3";
-    eleEs1150PotDisp.value = top.extPotDisp || "3.3";
-    eleEs1150TensAlim.value = top.extTensAlim || "120";
-    eleEs1150OpzTariffa.value = top.extOpzTariffa || "ETAA1M00F1";
+    eleEs1150PotImp.value = top.extPotImp || "6";
+    eleEs1150PotDisp.value = top.extPotDisp || "6.6";
+    eleEs1150TensAlim.value = top.extTensAlim || "220";
+    eleEs1150OpzTariffa.value = top.extOpzTariffa || "ETAB1I00C1";
     eleEs1150TipoMis.value = top.extTipoMisuratore || "CE";
   }
 
@@ -2172,6 +2245,15 @@ document.addEventListener("DOMContentLoaded", () => {
     await loadMockupCp1Fields();
   });
 
+  goSe1Dd.addEventListener("click", () => {
+    showScreen("se1Dd");
+    setStatus(statusSe1Dd, "", "");
+    logSe1Dd.classList.add("hidden");
+    logSe1Dd.textContent = "";
+    hideSe1DdEditor();
+    se1DdResults.textContent = "";
+  });
+
   goVt1.addEventListener("click", async () => {
     showScreen("vt1");
     logVt1.classList.add("hidden");
@@ -2288,6 +2370,7 @@ document.addEventListener("DOMContentLoaded", () => {
   backFromCanale.addEventListener("click", () => showScreen("home"));
   backFromSospeso.addEventListener("click", () => showScreen("home"));
   backFromMockupCp1.addEventListener("click", () => showScreen("home"));
+  backFromSe1Dd.addEventListener("click", () => showScreen("home"));
   backFromVt1.addEventListener("click", () => showScreen("home"));
   backFromEleAv1.addEventListener("click", () => showScreen("home"));
   backFromEleEs1100.addEventListener("click", () => showScreen("home"));
@@ -2456,6 +2539,187 @@ document.addEventListener("DOMContentLoaded", () => {
       setStatus(statusSospeso, msg, "err");
     } finally {
       runSospesoBtn.disabled = false;
+    }
+  });
+
+  function hideSe1DdEditor() {
+    se1DdEditMode = "none";
+    se1DdEditor.classList.add("hidden");
+  }
+
+  function fillSe1DdEditorFromRow(row, mode) {
+    se1DdEditMode = mode;
+    se1DdEditor.classList.remove("hidden");
+    se1DdEditId.value =
+      row.att_ck_ddi_id != null && mode === "edit" ? String(row.att_ck_ddi_id) : "";
+    se1DdEditProcesso.value = row.processo_code || "";
+    se1DdEditVenditore.value = row.venditore_code || "";
+    se1DdEditNomeCampo.value = row.nome_campo || "TAR_AEEG_EE";
+    se1DdEditProgressivo.value =
+      row.progressivo != null && row.progressivo !== "" ? String(row.progressivo) : "";
+    se1DdEditValoreRichiesta.value = row.valore_richiesta || "";
+    se1DdEditValoreDl.value = row.valore_dl || "";
+    se1DdEditId.readOnly = mode !== "edit";
+    se1DdEditProgressivo.readOnly = mode === "new";
+    se1DdEditNomeCampo.readOnly = mode === "new";
+  }
+
+  function renderSe1DdResults(rows) {
+    se1DdLastRows = rows;
+    se1DdResults.textContent = "";
+    if (!rows.length) {
+      const empty = document.createElement("p");
+      empty.className = "hint";
+      empty.style.margin = "8px";
+      empty.textContent = "Nessuna riga trovata.";
+      se1DdResults.appendChild(empty);
+      return;
+    }
+    rows.forEach((row, idx) => {
+      const wrap = document.createElement("div");
+      wrap.className = "se1-dd-row";
+      const main = document.createElement("div");
+      main.className = "se1-dd-row-main";
+      main.textContent = [
+        `#${row.att_ck_ddi_id}`,
+        `prog ${row.progressivo}`,
+        row.nome_campo,
+        `rich=${row.valore_richiesta}`,
+        `dl=${row.valore_dl ?? ""}`,
+      ].join(" · ");
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "se1-dd-edit-icon";
+      btn.title = "Modifica";
+      btn.textContent = "✎";
+      btn.addEventListener("click", () => fillSe1DdEditorFromRow(row, "edit"));
+      wrap.appendChild(main);
+      wrap.appendChild(btn);
+      se1DdResults.appendChild(wrap);
+    });
+  }
+
+  function se1DdFilterValues() {
+    return {
+      processo: se1DdFilterProcesso.value.trim(),
+      venditore: se1DdFilterVenditore.value.trim(),
+      campo: se1DdFilterCampo.value.trim(),
+    };
+  }
+
+  async function searchSe1Dd() {
+    const f = se1DdFilterValues();
+    hideSe1DdEditor();
+    logSe1Dd.classList.add("hidden");
+    se1DdSearchBtn.disabled = true;
+    setStatus(statusSe1Dd, "Ricerca in corso…", "");
+    try {
+      const base = await getApiBase();
+      const q = new URLSearchParams({
+        processo_code: f.processo,
+        venditore_code: f.venditore,
+        valore_richiesta: f.campo,
+      });
+      const res = await fetch(`${base}/se1-dd/search?${q.toString()}`);
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.ok) {
+        setStatus(
+          statusSe1Dd,
+          data.error || data.message || `Errore HTTP ${res.status}`,
+          "err"
+        );
+        se1DdResults.textContent = "";
+        return;
+      }
+      const rows = Array.isArray(data.rows) ? data.rows : [];
+      renderSe1DdResults(rows);
+      setStatus(statusSe1Dd, `${rows.length} righe trovate.`, "ok");
+    } catch (e) {
+      setStatus(statusSe1Dd, String(e.message || e), "err");
+    } finally {
+      se1DdSearchBtn.disabled = false;
+    }
+  }
+
+  se1DdSearchBtn.addEventListener("click", () => searchSe1Dd());
+
+  se1DdNuovoBtn.addEventListener("click", () => {
+    const f = se1DdFilterValues();
+    fillSe1DdEditorFromRow(
+      {
+        processo_code: f.processo || "SE1",
+        venditore_code: f.venditore || "13V0000000",
+        valore_richiesta: f.campo || "TD",
+        nome_campo: "TAR_AEEG_EE",
+        progressivo: "(auto)",
+        valore_dl: "",
+      },
+      "new"
+    );
+    setStatus(statusSe1Dd, "Nuovo record: progressivo assegnato al salvataggio.", "");
+  });
+
+  se1DdCancelEditBtn.addEventListener("click", () => hideSe1DdEditor());
+
+  se1DdSaveBtn.addEventListener("click", async () => {
+    logSe1Dd.classList.add("hidden");
+    se1DdSaveBtn.disabled = true;
+    setStatus(statusSe1Dd, "Salvataggio…", "");
+    try {
+      const base = await getApiBase();
+      const record = {
+        processo_code: se1DdEditProcesso.value.trim(),
+        venditore_code: se1DdEditVenditore.value.trim(),
+        nome_campo: se1DdEditNomeCampo.value.trim(),
+        progressivo: se1DdEditProgressivo.value.trim(),
+        valore_richiesta: se1DdEditValoreRichiesta.value.trim(),
+        valore_dl: se1DdEditValoreDl.value.trim(),
+      };
+      let url;
+      let body;
+      if (se1DdEditMode === "new") {
+        url = `${base}/se1-dd/create`;
+        body = {
+          processo_code: record.processo_code,
+          venditore_code: record.venditore_code,
+          valore_richiesta: record.valore_richiesta,
+          valore_dl: record.valore_dl,
+          nome_campo: record.nome_campo || "TAR_AEEG_EE",
+        };
+      } else {
+        url = `${base}/se1-dd/update`;
+        record.att_ck_ddi_id = se1DdEditId.value.trim();
+        body = { record };
+      }
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.ok) {
+        setStatus(
+          statusSe1Dd,
+          data.error || data.message || `Errore HTTP ${res.status}`,
+          "err"
+        );
+        if (data.changes) {
+          logSe1Dd.textContent = formatChanges(data.changes);
+          logSe1Dd.classList.remove("hidden");
+        }
+        return;
+      }
+      hideSe1DdEditor();
+      setStatus(statusSe1Dd, "Salvato.", "ok");
+      if (data.changes?.length) {
+        logSe1Dd.textContent = formatChanges(data.changes);
+        logSe1Dd.classList.remove("hidden");
+      }
+      await searchSe1Dd();
+    } catch (e) {
+      setStatus(statusSe1Dd, String(e.message || e), "err");
+    } finally {
+      se1DdSaveBtn.disabled = false;
     }
   });
 
@@ -2718,21 +2982,35 @@ document.addEventListener("DOMContentLoaded", () => {
       const ctx = await loadRequestContextForFlow();
       setDbJsonBox(eleEs1150DbJson, ctx.db);
       const v = ctx.values;
+      eleEs1150VenditoreCache = v.venditoreCodice || "13V0000000";
+      eleEs1150DistributoreCache =
+        pickFlat(v.flat, "DISTRIBUTORE", "COD_DISTRIBUTORE", "CODICE_DISTRIBUTORE") ||
+        "13D0000014";
+      eleEs1150PivaDestCache =
+        pickFlat(v.flat, "PIVA_DEST", "PIVA_DESTINATARIO", "PIVA_DISTRIBUTORE") ||
+        "00225170687";
+      const tensFaseRaw = v.extTensFase || pickFlat(v.flat, "EXT_TENS_FASE", "TENS_FASE");
+      eleEs1150TensFaseCache =
+        tensFaseRaw && /monof/i.test(String(tensFaseRaw))
+          ? "BT Monofase"
+          : tensFaseRaw || "BT Monofase";
       fillEleEs1150InputsFromTop({
-        documentkey: v.documentkey,
-        rif_ext: v.rif_ext,
+        requestCode: v.requestCode,
         pod: v.pod,
         extDtDecorD: toDDMMYYYYForAv1(v.extDtDecorD) || todayDDMMYYYY(),
-        codContrDisp: v.codContrDisp || "",
+        codContrDisp:
+          v.codContrDisp ||
+          pickFlat(v.flat, "COD_CONTR_DISP", "CODICE_CONTRATTO_DISP") ||
+          "",
         extNome: v.extNome || v.zNome,
         extCognome: v.extCognome || v.zCognome,
         extRagsoc: v.extRagsoc || v.zRagsoc,
         extCodFiscale: v.extCodFiscale || v.zCodiceFiscale,
         extPartitaIva: v.extPartitaIva || v.zPartitaIva,
-        extPotImp: v.extPotImp || "3",
-        extPotDisp: v.extPotDisp || "3.3",
-        extTensAlim: v.extTensAlim || "120",
-        extOpzTariffa: v.extOpzTariffa || "ETAA1M00F1",
+        extPotImp: v.extPotImp || "6",
+        extPotDisp: v.extPotDisp || "6.6",
+        extTensAlim: v.extTensAlim || "220",
+        extOpzTariffa: v.extOpzTariffa || "ETAB1I00C1",
         extTipoMisuratore: "CE",
       });
       applyEleEs1150FieldsToPayload(payload, collectEleEs1150FormValues());
@@ -3050,7 +3328,7 @@ document.addEventListener("DOMContentLoaded", () => {
     eleEs1150Send.disabled = true;
     setStatus(statusEleEs1150, "Invio in corso…", "");
     try {
-      const endpoint = await getVt1Url();
+      const endpoint = await getEleEs1InboundFileUrl();
       console.debug("[ELE ES1 150] POST", endpoint);
       const headers = {
         "Content-Type": "application/json",

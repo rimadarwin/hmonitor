@@ -1,15 +1,15 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="it">
 <!--
-  @author Maurizio di Sabato <maurizio.disabato@xcconsulting.it>
+  @author MG
   @description Side panel estensione Hera - avanzamento pratiche
-  @modified 29.09.2026 - MDS | ES1 ACK: correlation_id da API /dlsii-ack-context
-  @modified 29.09.2026 - MDS | Flusso GAS VTG 150 (inboundflow, evento 09T)
-  @modified 28.09.2026 - MDS | Rimuove titolo Operazioni dalla home
-  @modified 28.09.2026 - MDS | Flussi ELE ES1 100 e ELE ES1 150 (inboundflow)
-  @modified 24.09.2026 - MDS | Pulsante blu Mockup CP1 (simulatore_risposta_campi)
-  @modified 23.09.2026 - MDS | Pulsante blu Riporta in sospeso (amc.sap_messages)
-  @modified 23.09.2026 - MDS | Riquadri JSON amc.request (id_request + input) per ogni flusso
+  @modified 29.09.2026 - MG | ES1 ACK: correlation_id da API /dlsii-ack-context
+  @modified 29.09.2026 - MG | Flusso GAS VTG 150 (inboundflow, evento 09T)
+  @modified 28.09.2026 - MG | Rimuove titolo Operazioni dalla home
+  @modified 28.09.2026 - MG | Flussi ELE ES1 100 e ELE ES1 150 (inboundflow)
+  @modified 24.09.2026 - MG | Pulsante blu Mockup CP1 (simulatore_risposta_campi)
+  @modified 23.09.2026 - MG | Pulsante blu Riporta in sospeso (amc.sap_messages)
+  @modified 23.09.2026 - MG | Riquadri JSON amc.request (id_request + input) per ogni flusso
 -->
 <head>
   <meta charset="UTF-8" />
@@ -25,6 +25,7 @@
       <button type="button" id="goCanale" class="choice primary">Switch ATOA/FILE</button>
       <button type="button" id="goSospeso" class="choice primary">Riporta in sospeso</button>
       <button type="button" id="goMockupCp1" class="choice primary">Mockup CP1</button>
+      <button type="button" id="goSe1Dd" class="choice primary">ELE SE1 DD</button>
       <button type="button" id="goBatchApn" class="choice accent">APN BATCH MS_083</button>
       <button type="button" id="goEleAv1" class="choice accent">ELE AV1 150</button>
       <button type="button" id="goEleEs1100" class="choice accent">ELE ES1 100</button>
@@ -139,6 +140,71 @@
       <button type="button" id="backFromMockupCp1" class="linkish">← Indietro</button>
       <p class="footer tight">
         <a href="#" id="openOptionsMockupCp1">Impostazioni API locale</a>
+      </p>
+    </section>
+
+    <!-- ELE SE1 DD → amc.z_hk_att_ck_ddi -->
+    <section id="screenSe1Dd" class="hidden">
+      <h1>ELE SE1 DD</h1>
+      <p class="hint">
+        Cerca e modifica <code>amc.z_hk_att_ck_ddi</code> (API hmonitor). Nuovo record:
+        <code>nome_campo=TAR_AEEG_EE</code>, progressivo automatico.
+      </p>
+      <label class="field">
+        <span>processo_code (processo)</span>
+        <input type="text" id="se1DdFilterProcesso" value="SE1" autocomplete="off" spellcheck="false" />
+      </label>
+      <label class="field">
+        <span>venditore_code (venditore)</span>
+        <input type="text" id="se1DdFilterVenditore" value="13V0000000" autocomplete="off" spellcheck="false" />
+      </label>
+      <label class="field">
+        <span>valore_richiesta (campo)</span>
+        <input type="text" id="se1DdFilterCampo" value="TD" autocomplete="off" spellcheck="false" />
+      </label>
+      <div class="se1-dd-toolbar">
+        <button type="button" id="se1DdSearchBtn" class="secondary">Cerca</button>
+        <button type="button" id="se1DdNuovoBtn" class="secondary">Nuovo</button>
+      </div>
+      <div id="se1DdResults" class="se1-dd-results" aria-live="polite"></div>
+      <div id="se1DdEditor" class="se1-dd-editor hidden">
+        <p class="subhint">Modifica record</p>
+        <label class="field">
+          <span>att_ck_ddi_id</span>
+          <input type="text" id="se1DdEditId" readonly autocomplete="off" spellcheck="false" />
+        </label>
+        <label class="field">
+          <span>processo_code</span>
+          <input type="text" id="se1DdEditProcesso" autocomplete="off" spellcheck="false" />
+        </label>
+        <label class="field">
+          <span>venditore_code</span>
+          <input type="text" id="se1DdEditVenditore" autocomplete="off" spellcheck="false" />
+        </label>
+        <label class="field">
+          <span>nome_campo</span>
+          <input type="text" id="se1DdEditNomeCampo" autocomplete="off" spellcheck="false" />
+        </label>
+        <label class="field">
+          <span>progressivo</span>
+          <input type="text" id="se1DdEditProgressivo" autocomplete="off" spellcheck="false" />
+        </label>
+        <label class="field">
+          <span>valore_richiesta</span>
+          <input type="text" id="se1DdEditValoreRichiesta" autocomplete="off" spellcheck="false" />
+        </label>
+        <label class="field">
+          <span>valore_dl</span>
+          <input type="text" id="se1DdEditValoreDl" autocomplete="off" spellcheck="false" />
+        </label>
+        <button type="button" id="se1DdSaveBtn" class="primary full">Salva</button>
+        <button type="button" id="se1DdCancelEditBtn" class="linkish">Annulla modifica</button>
+      </div>
+      <div id="statusSe1Dd" class="status" aria-live="polite"></div>
+      <pre id="logSe1Dd" class="log hidden"></pre>
+      <button type="button" id="backFromSe1Dd" class="linkish">← Indietro</button>
+      <p class="footer tight">
+        <a href="#" id="openOptionsSe1Dd">Impostazioni API</a>
       </p>
     </section>
 
@@ -333,40 +399,40 @@
       </p>
     </section>
 
-    <!-- ELE ES1 150 → /dlsii/inboundflow -->
+    <!-- ELE ES1 150 → /dlsii/inboundFileFlow -->
     <section id="screenEleEs1150" class="hidden">
       <h1>ELE ES1 150</h1>
       <p class="hint">
-        Endpoint <code>/dlsii/inboundflow</code> · <code>ES1.0150</code>.
-        Campi chiave da amc.request + schermata; <code>EXT_DT_DECOR_D</code> = oggi (DD/MM/YYYY).
+        Endpoint <code>/dlsii/inboundFileFlow</code> · <code>S01.0150</code> (CSV, evento
+        <code>0S2</code>). Campi 6–15 da pratica; 11–12 = nome/cognome.
       </p>
       <button type="button" id="scrapeAgainEleEs1150" class="secondary full">Refresh dati</button>
       <label class="field">
-        <span>DOCUMENTKEY</span>
+        <span>Campo 6 — codice pratica</span>
         <input type="text" id="eleEs1150Documentkey" autocomplete="off" spellcheck="false" />
       </label>
       <label class="field">
-        <span>RIF_EXT (Codice pratica SII)</span>
+        <span>Campo 7 — codice pratica DL (default …_DL)</span>
         <input type="text" id="eleEs1150RifExt" autocomplete="off" spellcheck="false" />
       </label>
       <label class="field">
-        <span>EXT_POD</span>
+        <span>Campo 10 — POD</span>
         <input type="text" id="eleEs1150Pod" autocomplete="off" spellcheck="false" />
       </label>
       <label class="field">
-        <span>EXT_DT_DECOR_D (DD/MM/YYYY)</span>
+        <span>Campo 9 — data decorrenza (DD/MM/YYYY)</span>
         <input type="text" id="eleEs1150ExtDtDecor" autocomplete="off" spellcheck="false" />
       </label>
       <label class="field">
-        <span>COD_CONTR_DISP</span>
+        <span>Campo 4 — COD_CONTR_DISP</span>
         <input type="text" id="eleEs1150CodContrDisp" autocomplete="off" spellcheck="false" />
       </label>
       <label class="field">
-        <span>NOME</span>
+        <span>Campo 11 — NOME</span>
         <input type="text" id="eleEs1150Nome" autocomplete="off" spellcheck="false" />
       </label>
       <label class="field">
-        <span>COGNOME</span>
+        <span>Campo 12 — COGNOME</span>
         <input type="text" id="eleEs1150Cognome" autocomplete="off" spellcheck="false" />
       </label>
       <label class="field">
@@ -382,24 +448,24 @@
         <input type="text" id="eleEs1150Piva" autocomplete="off" spellcheck="false" />
       </label>
       <label class="field">
-        <span>EXT_POT_IMP</span>
-        <input type="text" id="eleEs1150PotImp" autocomplete="off" spellcheck="false" />
+        <span>Campo 51 — potenza imp.</span>
+        <input type="text" id="eleEs1150PotImp" autocomplete="off" spellcheck="false" value="6" />
       </label>
       <label class="field">
-        <span>EXT_POT_DISP</span>
-        <input type="text" id="eleEs1150PotDisp" autocomplete="off" spellcheck="false" />
+        <span>Campo 52 — potenza disp.</span>
+        <input type="text" id="eleEs1150PotDisp" autocomplete="off" spellcheck="false" value="6.6" />
       </label>
       <label class="field">
-        <span>EXT_TENS_ALIM</span>
-        <input type="text" id="eleEs1150TensAlim" autocomplete="off" spellcheck="false" />
+        <span>Campo 55 — tensione alim.</span>
+        <input type="text" id="eleEs1150TensAlim" autocomplete="off" spellcheck="false" value="220" />
       </label>
       <label class="field">
-        <span>EXT_OPZ_TARIFFA</span>
-        <input type="text" id="eleEs1150OpzTariffa" autocomplete="off" spellcheck="false" />
+        <span>Campo 59 — opzione tariffa</span>
+        <input type="text" id="eleEs1150OpzTariffa" autocomplete="off" spellcheck="false" value="ETAB1I00C1" />
       </label>
       <label class="field">
-        <span>EXT_TIPO_MISURATORE</span>
-        <input type="text" id="eleEs1150TipoMis" autocomplete="off" spellcheck="false" />
+        <span>Campo 20 — tipo misuratore</span>
+        <input type="text" id="eleEs1150TipoMis" autocomplete="off" spellcheck="false" value="CE" />
       </label>
       <p class="hint vt1-auth-hint">
         <strong>Authorization</strong> e cookie: stesse impostazioni VT1 in

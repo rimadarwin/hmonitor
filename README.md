@@ -101,6 +101,16 @@ Legge `id_request` e `input` da `amc.request` (populate flussi estensione).
 { "request_code": "A00005052536" }
 ```
 
+### `GET /se1-dd/search`
+
+Cerca in `amc.z_hk_att_ck_ddi` (schermata **ELE SE1 DD**).
+
+Query: `processo_code`, `venditore_code`, `valore_richiesta`
+
+### `POST /se1-dd/create` · `POST /se1-dd/update`
+
+Insert/update tariffe DDI (`nome_campo` default `TAR_AEEG_EE`, progressivo auto in create).
+
 ### `POST /dlsii-ack-context`
 
 Ultimo messaggio DLSII 0050 `INVIATO` con `correlation_id` (flusso **ELE ES1 ACK**).

@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Hera - avanzamento pratiche",
-  "version": "1.22.2",
+  "version": "1.23.0",
   "description": "Date, ATOA/FILE, sospeso, Mockup CP1, flussi ELE/GAS/APN (ES1 ACK, VTG).",
   "minimum_chrome_version": "114",
   "action": {

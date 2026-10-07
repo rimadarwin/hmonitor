@@ -1,7 +1,7 @@
-/**
- * @author Maurizio di Sabato <maurizio.disabato@xcconsulting.it>
+﻿/**
+ * @author MG
  * @description Stili side panel estensione Hera - avanzamento pratiche
- * @modified 28.09.2026 - MDS | Pulsanti home più compatti (font 12px, padding ridotto)
+ * @modified 28.09.2026 - MG | Pulsanti home più compatti (font 12px, padding ridotto)
  */
 * {
   box-sizing: border-box;
@@ -252,4 +252,68 @@ textarea:focus {
 
 .linkish:hover {
   color: #1d4ed8;
+}
+
+.se1-dd-toolbar {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.se1-dd-toolbar button {
+  flex: 1;
+}
+
+.se1-dd-results {
+  margin-bottom: 12px;
+  max-height: 220px;
+  overflow-y: auto;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  background: #fff;
+}
+
+.se1-dd-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px 10px;
+  border-bottom: 1px solid #e5e7eb;
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.se1-dd-row:last-child {
+  border-bottom: none;
+}
+
+.se1-dd-row-main {
+  flex: 1;
+  min-width: 0;
+  word-break: break-word;
+}
+
+.se1-dd-edit-icon {
+  flex-shrink: 0;
+  padding: 2px 8px;
+  border: 1px solid #cbd5e1;
+  border-radius: 4px;
+  background: #f8fafc;
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1.2;
+}
+
+.se1-dd-edit-icon:hover {
+  background: #e2e8f0;
+}
+
+.se1-dd-editor.hidden {
+  display: none;
+}
+
+.se1-dd-editor {
+  padding: 10px 0 4px;
+  border-top: 1px solid #e5e7eb;
+  margin-top: 8px;
 }

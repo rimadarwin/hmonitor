@@ -1,9 +1,9 @@
-# -*- coding: utf-8 -*-
+﻿# -*- coding: utf-8 -*-
 """
-@author Maurizio di Sabato <maurizio.disabato@xcconsulting.it>
+@author MG
 @description Riporta in sospeso una richiesta su amc.sap_messages
-@modified 23.09.2026 - MDS | Se più righe per request_code, aggiorna solo l'ultimo record
-@modified 23.09.2026 - MDS | UPDATE message_state=SOSPESO, attiva_sap='' per request_code
+@modified 23.09.2026 - MG | Se più righe per request_code, aggiorna solo l'ultimo record
+@modified 23.09.2026 - MG | UPDATE message_state=SOSPESO, attiva_sap='' per request_code
 
 Usabile da CLI e da API (estensione Chrome).
 """

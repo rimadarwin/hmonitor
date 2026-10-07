@@ -1,8 +1,8 @@
-# -*- coding: utf-8 -*-
+﻿# -*- coding: utf-8 -*-
 """
-@author Maurizio di Sabato <maurizio.disabato@xcconsulting.it>
+@author MG
 @description correlation_id da amc.dlsii_messages per recovery ES1 ACK (flusso 0050 INVIATO)
-@modified 29.09.2026 - MDS | Query ultimo messaggio 0050 per request_code
+@modified 29.09.2026 - MG | Query ultimo messaggio 0050 per request_code
 """
 import os
 from dataclasses import dataclass

@@ -1,11 +1,11 @@
-# -*- coding: utf-8 -*-
+﻿# -*- coding: utf-8 -*-
 """
-@author Maurizio di Sabato <maurizio.disabato@xcconsulting.it>
+@author MG
 @description Server Flask per estensione Chrome (date, switch canale, request-data)
-@modified 24.09.2026 - MDS | Endpoint Mockup CP1 load/update (simulatore_risposta_campi)
-@modified 23.09.2026 - MDS | Endpoint POST /riporta-sospeso (amc.sap_messages)
-@modified 29.09.2026 - MDS | Endpoint POST /dlsii-ack-context (correlation_id messaggio 0050)
-@modified 23.09.2026 - MDS | Endpoint POST /request-data (id_request + input da amc.request)
+@modified 24.09.2026 - MG | Endpoint Mockup CP1 load/update (simulatore_risposta_campi)
+@modified 23.09.2026 - MG | Endpoint POST /riporta-sospeso (amc.sap_messages)
+@modified 29.09.2026 - MG | Endpoint POST /dlsii-ack-context (correlation_id messaggio 0050)
+@modified 23.09.2026 - MG | Endpoint POST /request-data (id_request + input da amc.request)
 
 Server HTTP locale per l'estensione Chrome: espone POST /update che esegue
 la stessa logica di update_request_dates.run_update_request_dates.
@@ -25,6 +25,7 @@ from update_request_dates import UpdateResult, run_update_request_dates
 from switch_canale_com import run_switch_canale_com
 from fetch_request_data import run_fetch_request_data
 from fetch_dlsii_ack_context import run_fetch_dlsii_ack_context
+from se1_dd import run_se1_dd_create, run_se1_dd_search, run_se1_dd_update
 from riporta_in_sospeso import run_riporta_in_sospeso
 from mockup_cp1 import run_mockup_cp1_load, run_mockup_cp1_update
 
@@ -70,6 +71,9 @@ def root():
                 "/riporta-sospeso",
                 "/mockup-cp1/load",
                 "/mockup-cp1/update",
+                "/se1-dd/search",
+                "/se1-dd/create",
+                "/se1-dd/update",
             ],
         }
     )
@@ -145,6 +149,50 @@ def dlsii_ack_context():
     ), status
 
 
+@app.get("/se1-dd/search")
+def se1_dd_search():
+    """
+    Cerca righe in amc.z_hk_att_ck_ddi.
+    Query: processo_code, venditore_code, valore_richiesta
+    (alias: processo, venditore, campo).
+    """
+    args = request.args
+    processo = args.get("processo_code") or args.get("processo") or ""
+    venditore = args.get("venditore_code") or args.get("venditore") or ""
+    valore = args.get("valore_richiesta") or args.get("campo") or ""
+    result = run_se1_dd_search(processo, venditore, valore)
+    status = 200 if result.ok else 400
+    return jsonify(
+        {"ok": result.ok, "rows": result.rows, "error": result.error}
+    ), status
+
+
+@app.post("/se1-dd/create")
+def se1_dd_create():
+    """Nuovo record TAR_AEEG_EE con progressivo auto."""
+    data = request.get_json(silent=True) or {}
+    result = run_se1_dd_create(
+        data.get("processo_code", data.get("processo", "")),
+        data.get("venditore_code", data.get("venditore", "")),
+        data.get("valore_richiesta", data.get("campo", "")),
+        data.get("valore_dl", ""),
+        nome_campo=data.get("nome_campo"),
+        progressivo=data.get("progressivo"),
+    )
+    status = 200 if result.ok else 400
+    return jsonify(_serialize_result(result)), status
+
+
+@app.post("/se1-dd/update")
+def se1_dd_update():
+    """Aggiorna record per att_ck_ddi_id."""
+    data = request.get_json(silent=True) or {}
+    record = data.get("record") or data
+    result = run_se1_dd_update(record)
+    status = 200 if result.ok else 400
+    return jsonify(_serialize_result(result)), status
+
+
 @app.post("/riporta-sospeso")
 def riporta_sospeso():
     """
@@ -216,6 +264,8 @@ def main():
     print("  POST /riporta-sospeso JSON: {\"request_code\": \"…\"}")
     print("  POST /mockup-cp1/load   JSON: {\"id_risposta_testata\": 802}")
     print("  POST /mockup-cp1/update JSON: {\"id_risposta_testata\": 802, \"fields\": {…}}")
+    print("  GET  /se1-dd/search ?processo_code=SE1&venditore_code=…&valore_richiesta=TD")
+    print("  POST /se1-dd/create  POST /se1-dd/update")
     print("  GET  /health")
     app.run(host=host, port=port, threaded=True)
 

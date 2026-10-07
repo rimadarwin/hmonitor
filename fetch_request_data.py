@@ -1,8 +1,8 @@
-# -*- coding: utf-8 -*-
+﻿# -*- coding: utf-8 -*-
 """
-@author Maurizio di Sabato <maurizio.disabato@xcconsulting.it>
+@author MG
 @description Recupero id_request + input da amc.request per popolare i body dei flussi
-@modified 23.09.2026 - MDS | Query amc.request per request_code (id_request, input JSON)
+@modified 23.09.2026 - MG | Query amc.request per request_code (id_request, input JSON)
 """
 import json
 import os

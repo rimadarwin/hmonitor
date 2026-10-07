@@ -1,9 +1,9 @@
-/**
- * @author Maurizio di Sabato <maurizio.disabato@xcconsulting.it>
+﻿/**
+ * @author MG
  * @description Recupero e mapping dati da amc.request (API /request-data) per i body dei flussi
- * @modified 29.09.2026 - MDS | API /dlsii-ack-context (correlation_id per ES1 ACK)
- * @modified 28.09.2026 - MDS | Merge scrape UI + alias COD_FISCALE/PIVA/Codice Pratica SII
- * @modified 23.09.2026 - MDS | Flatten input + mapping campi comuni (POD/PDR, RIF_EXT, potenze, ecc.)
+ * @modified 29.09.2026 - MG | API /dlsii-ack-context (correlation_id per ES1 ACK)
+ * @modified 28.09.2026 - MG | Merge scrape UI + alias COD_FISCALE/PIVA/Codice Pratica SII
+ * @modified 23.09.2026 - MG | Flatten input + mapping campi comuni (POD/PDR, RIF_EXT, potenze, ecc.)
  */
 
 /** Chiama POST /request-data sul server Flask/Render. */

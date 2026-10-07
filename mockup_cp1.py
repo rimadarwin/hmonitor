@@ -1,8 +1,8 @@
-# -*- coding: utf-8 -*-
+﻿# -*- coding: utf-8 -*-
 """
-@author Maurizio di Sabato <maurizio.disabato@xcconsulting.it>
+@author MG
 @description Mockup CP1: lettura/aggiornamento campi su amc.simulatore_risposta_campi
-@modified 24.09.2026 - MDS | Load/update EXT_POT_DISP, EXT_POT_IMP, USO_FORNITURA, POD per id_risposta_testata
+@modified 24.09.2026 - MG | Load/update EXT_POT_DISP, EXT_POT_IMP, USO_FORNITURA, POD per id_risposta_testata
 
 Usabile da CLI e da API (estensione Chrome).
 """
