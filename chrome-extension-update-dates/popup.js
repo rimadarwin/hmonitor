@@ -2251,7 +2251,7 @@ document.addEventListener("DOMContentLoaded", () => {
     logSe1Dd.classList.add("hidden");
     logSe1Dd.textContent = "";
     hideSe1DdEditor();
-    se1DdResults.textContent = "";
+    hideSe1DdResults();
   });
 
   goVt1.addEventListener("click", async () => {
@@ -2547,11 +2547,37 @@ document.addEventListener("DOMContentLoaded", () => {
     se1DdEditor.classList.add("hidden");
   }
 
+  function hideSe1DdResults() {
+    se1DdLastRows = [];
+    if (se1DdResults) {
+      se1DdResults.textContent = "";
+      se1DdResults.classList.add("hidden");
+    }
+  }
+
+  function showSe1DdResults() {
+    if (se1DdResults) se1DdResults.classList.remove("hidden");
+  }
+
+  const se1DdEditIdRow = document.getElementById("se1DdEditIdRow");
+  const se1DdEditProgressivoRow = document.getElementById("se1DdEditProgressivoRow");
+  const se1DdEditorTitle = document.getElementById("se1DdEditorTitle");
+
   function fillSe1DdEditorFromRow(row, mode) {
+    hideSe1DdResults();
+    setStatus(statusSe1Dd, "", "");
     se1DdEditMode = mode;
     se1DdEditor.classList.remove("hidden");
+    const isNew = mode === "new";
+    if (se1DdEditIdRow) se1DdEditIdRow.classList.toggle("hidden", isNew);
+    if (se1DdEditProgressivoRow) se1DdEditProgressivoRow.classList.toggle("hidden", isNew);
+    if (se1DdEditorTitle) {
+      se1DdEditorTitle.textContent = isNew
+        ? "Nuovo record"
+        : `Modifica record #${row.att_ck_ddi_id ?? ""}`;
+    }
     se1DdEditId.value =
-      row.att_ck_ddi_id != null && mode === "edit" ? String(row.att_ck_ddi_id) : "";
+      !isNew && row.att_ck_ddi_id != null ? String(row.att_ck_ddi_id) : "";
     se1DdEditProcesso.value = row.processo_code || "";
     se1DdEditVenditore.value = row.venditore_code || "";
     se1DdEditNomeCampo.value = row.nome_campo || "TAR_AEEG_EE";
@@ -2559,13 +2585,13 @@ document.addEventListener("DOMContentLoaded", () => {
       row.progressivo != null && row.progressivo !== "" ? String(row.progressivo) : "";
     se1DdEditValoreRichiesta.value = row.valore_richiesta || "";
     se1DdEditValoreDl.value = row.valore_dl || "";
-    se1DdEditId.readOnly = mode !== "edit";
-    se1DdEditProgressivo.readOnly = mode === "new";
-    se1DdEditNomeCampo.readOnly = mode === "new";
+    se1DdEditProgressivo.readOnly = isNew;
+    se1DdEditNomeCampo.readOnly = isNew;
   }
 
   function renderSe1DdResults(rows) {
     se1DdLastRows = rows;
+    showSe1DdResults();
     se1DdResults.textContent = "";
     if (!rows.length) {
       const empty = document.createElement("p");
@@ -2610,6 +2636,7 @@ document.addEventListener("DOMContentLoaded", () => {
   async function searchSe1Dd() {
     const f = se1DdFilterValues();
     hideSe1DdEditor();
+    hideSe1DdResults();
     logSe1Dd.classList.add("hidden");
     se1DdSearchBtn.disabled = true;
     setStatus(statusSe1Dd, "Ricerca in corso…", "");
@@ -2656,7 +2683,11 @@ document.addEventListener("DOMContentLoaded", () => {
       },
       "new"
     );
-    setStatus(statusSe1Dd, "Nuovo record: progressivo assegnato al salvataggio.", "");
+    setStatus(
+      statusSe1Dd,
+      "Nuovo record: id e progressivo assegnati dal sistema al salvataggio.",
+      ""
+    );
   });
 
   se1DdCancelEditBtn.addEventListener("click", () => hideSe1DdEditor());

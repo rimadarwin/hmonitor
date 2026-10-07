@@ -25,7 +25,7 @@
       <button type="button" id="goCanale" class="choice primary">Switch ATOA/FILE</button>
       <button type="button" id="goSospeso" class="choice primary">Riporta in sospeso</button>
       <button type="button" id="goMockupCp1" class="choice primary">Mockup CP1</button>
-      <button type="button" id="goSe1Dd" class="choice primary">ELE SE1 DD</button>
+      <button type="button" id="goSe1Dd" class="choice primary">Dati Discordanti</button>
       <button type="button" id="goBatchApn" class="choice accent">APN BATCH MS_083</button>
       <button type="button" id="goEleAv1" class="choice accent">ELE AV1 150</button>
       <button type="button" id="goEleEs1100" class="choice accent">ELE ES1 100</button>
@@ -145,10 +145,11 @@
 
     <!-- ELE SE1 DD → amc.z_hk_att_ck_ddi -->
     <section id="screenSe1Dd" class="hidden">
-      <h1>ELE SE1 DD</h1>
+      <h1>Dati Discordanti</h1>
       <p class="hint">
-        Cerca e modifica <code>amc.z_hk_att_ck_ddi</code> (API hmonitor). Nuovo record:
-        <code>nome_campo=TAR_AEEG_EE</code>, progressivo automatico.
+        Cerca e modifica <code>amc.z_hk_att_ck_ddi</code> (API hmonitor). In inserimento
+        <code>att_ck_ddi_id</code> e progressivo sono assegnati dal sistema al salvataggio
+        (<code>nome_campo=TAR_AEEG_EE</code>).
       </p>
       <label class="field">
         <span>processo_code (processo)</span>
@@ -168,8 +169,8 @@
       </div>
       <div id="se1DdResults" class="se1-dd-results" aria-live="polite"></div>
       <div id="se1DdEditor" class="se1-dd-editor hidden">
-        <p class="subhint">Modifica record</p>
-        <label class="field">
+        <p class="subhint" id="se1DdEditorTitle">Modifica record</p>
+        <label class="field hidden" id="se1DdEditIdRow">
           <span>att_ck_ddi_id</span>
           <input type="text" id="se1DdEditId" readonly autocomplete="off" spellcheck="false" />
         </label>
@@ -185,7 +186,7 @@
           <span>nome_campo</span>
           <input type="text" id="se1DdEditNomeCampo" autocomplete="off" spellcheck="false" />
         </label>
-        <label class="field">
+        <label class="field hidden" id="se1DdEditProgressivoRow">
           <span>progressivo</span>
           <input type="text" id="se1DdEditProgressivo" autocomplete="off" spellcheck="false" />
         </label>
